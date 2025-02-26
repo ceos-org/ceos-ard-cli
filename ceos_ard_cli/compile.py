@@ -130,7 +130,6 @@ def update_requirement_reference(req, old_id, new_id):
         return [update_requirement_reference(r, old_id, new_id) for r in req]
     elif isinstance(req, str):
         # todo: this can probably be improved with a regex to minimmize false positives
-        print(old_id, new_id)
         return req.replace(f"@{old_id}", f"@sec:{new_id}")
     else:
         return req

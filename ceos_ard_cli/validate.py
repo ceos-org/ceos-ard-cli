@@ -43,4 +43,5 @@ def validate():
     for file in all_files:
         filepath = str(file.absolute())
         if filepath not in used_files:
-            print(f"- {file.relative_to(".")}")
+            rel_path = file.relative_to(".")
+            print(f"- {rel_path}")

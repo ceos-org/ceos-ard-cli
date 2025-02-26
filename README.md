@@ -22,9 +22,9 @@ You will need to have **Python 3.9** or any later version installed.
 
 For the `generate` and `generate-all` commands you also need the following software installed:
 
-- pandoc 3.6 or later (for Word + HTML generation)
-- pandoc-crossref (for table/image/section references)
-- pango-view (for PDF generation)
+- [pandoc](https://pandoc.org/) v3.6.2 (for Word + HTML generation)
+- [pandoc-crossref](https://github.com/lierdakil/pandoc-crossref) [v0.3.18.1a](https://github.com/lierdakil/pandoc-crossref/releases/tag/v0.3.18.1a) or later (for table/image/section references)
+- [weasyprint](https://doc.courtbouillon.org/weasyprint/stable/index.html) (for PDF generation)
 
 > ![NOTE]
 > The following command doesn't work yet as the package as not been published on pypi yet.
@@ -70,7 +70,7 @@ Check `ceos-ard validate --help` for more details.
 
 ## Development
 
-1. Install the dependencies (Python, Pandoc, pandoc-crossref, pango-view) as indicated in [Installation](#installation)
+1. Install the dependencies as indicated in [Installation](#installation)
 2. Fork this repository if you plan to change the code or create pull requests.
 3. Clone either your forked repository or this repository, e.g. `git clone https://github.com/ceos-org/ceos-ard-cli`
 4. Switch into the newly created folder: `cd ceos-ard-cli`
