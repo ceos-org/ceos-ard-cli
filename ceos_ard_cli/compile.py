@@ -63,25 +63,75 @@ def compile_bibtex(data, out):
     with open(out, 'w', encoding="utf-8") as f:
         f.write(bibtex)
 
+# make uid unique so that it can be used in multiple categories
+def create_uid(block, req_id):
+    return slugify(block['category']['id'] + "-" + req_id)
+
 def compile_markdown(data, out, editable):
     # create a copy of the data for the template
     context = data.copy()
+
     context["editable"] = editable
     # sort glossary
     context["glossary"] = sorted(context["glossary"], key = lambda x: x['term'].lower())
     # todo: implement automatic creation of history based on git logs?
+    # todo: alternatively, add changelog to the individual files with a timestamp and compile it from there
     context["history"] = "Not available yet"
-    # generate uid for each requirement
+
+    # make a dict of all requirements for efficient dependency lookup
+    all_requirements = {}
+    # generate uid for each requirement and fill dependency lookups
+    for block in context["requirements"]:
+        # make a dict of the requirements in this category for efficient dependency lookup
+        local_requirements = {}
+        for req in block["requirements"]:
+            # make uid unique if it can be used in multiple categories
+            req['uid'] = create_uid(block, req['id'])
+            local_requirements[req['id']] = req['uid']
+            all_requirements[req['id']] = req['uid']
+
+    # resolve dependencies
     for block in context["requirements"]:
         for req in block["requirements"]:
-            if "/" not in req['id']:
-                # make uid unique if it can be used in multiple categories
-                req['uid'] = slugify(block['category']['id'] + "-" + req['id'])
-            else:
-                req['uid'] = slugify(req['id'])
+            for i, id in enumerate(req['dependencies']):
+                # 1. Check to the requirement in the same requirement category.
+                if id in local_requirements:
+                    ref_id = local_requirements[id]
+                # 2. Refers to the requirement in any other category.
+                elif id in all_requirements:
+                    ref_id = all_requirements[id]
+                else:
+                    raise ValueError(f"Unmet dependency {id} for requirement {req['uid']}")
+
+                req['dependencies'][i] = ref_id
+                # Update the requirements in the texts
+                update_requirement_references(req, id, ref_id)
+
     # fill the template
     template = read_template()
     markdown = template.render(**context)
+
     # write markdown file to disk
     with open(out, 'w', encoding="utf-8") as f:
         f.write(markdown)
+
+# replace all requirement references in the texts with the resolved references
+def update_requirement_references(req, old_id, new_id):
+    req['description'] = update_requirement_reference(req['description'], old_id, new_id)
+    if req['threshold'] is not None:
+        req['threshold']['description'] = update_requirement_reference(req['threshold']['description'], old_id, new_id)
+        req['threshold']['notes'] = update_requirement_reference(req['threshold']['notes'], old_id, new_id)
+    if req['goal'] is not None:
+        req['goal']['description'] = update_requirement_reference(req['goal']['description'], old_id, new_id)
+        req['goal']['notes'] = update_requirement_reference(req['goal']['notes'], old_id, new_id)
+
+# replace all requirement references in the given texts with the resolved references
+def update_requirement_reference(req, old_id, new_id):
+    if isinstance(req, list):
+        return [update_requirement_reference(r, old_id, new_id) for r in req]
+    elif isinstance(req, str):
+        # todo: this can probably be improved with a regex to minimmize false positives
+        print(old_id, new_id)
+        return req.replace(f"@{old_id}", f"@sec:{new_id}")
+    else:
+        return req

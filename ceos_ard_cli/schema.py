@@ -10,12 +10,12 @@ ANNEX_PATH = "./sections/annexes/{id}.yaml"
 REQUIREMENT_CATEGORY_PATH = "./sections/requirement-categories/{id}.yaml"
 REQUIREMENT_PATH = "./requirements/{id}.yaml"
 
-_REFS = lambda path, schema: EmptyList() | UniqueSeq(IdReference(path, schema))
-_SECTION_IDS = lambda path: _REFS(path, SECTION)
-_REFERENCE_IDS = EmptyList() | UniqueSeq(IdReference(REFERENCE_PATH))
+_REFS = lambda path, schema = None, resolve = False: EmptyList() | UniqueSeq(IdReference(path, schema, resolve))
+_RESOLVED_REFS = lambda path, schema: _REFS(path, schema, resolve = True)
+_RESOLVED_SECTIONS = lambda path: _RESOLVED_REFS(path, SECTION)
+_REFERENCE_IDS = _REFS(REFERENCE_PATH)
 
-# The order is important
-_MARKDOWN = lambda file: Markdown() | MdReference(file)
+_MARKDOWN = lambda file: Markdown() | MdReference(file) # The order is important
 
 _REQUIREMENT_PART = lambda file: NullNone() | Map({
     'description': _MARKDOWN(file),
@@ -32,13 +32,13 @@ GLOSSARY = lambda file: Map({
     'term': Str(),
     'description': _MARKDOWN(file),
 })
-_GLOSSARY_IDS = _REFS(GLOSSARY_PATH, GLOSSARY)
+_RESOLVED_GLOSSARY = _RESOLVED_REFS(GLOSSARY_PATH, GLOSSARY)
 
 SECTION = lambda file: Map({
     Optional('id', default = ""): Str(),
     'title': Str(),
     'description': _MARKDOWN(file),
-    Optional('glossary', default = []): _GLOSSARY_IDS,
+    Optional('glossary', default = []): _RESOLVED_GLOSSARY,
     Optional('references', default = []): _REFERENCE_IDS,
 })
 
@@ -47,10 +47,10 @@ PFS_DOCUMENT = lambda file: Map({
     'title': Str(),
     'type': Str(),
     'applies_to': _MARKDOWN(file),
-    Optional('introduction', default = []): _SECTION_IDS(INTRODUCTION_PATH),
-    Optional('glossary', default = []): _GLOSSARY_IDS,
+    Optional('introduction', default = []): _RESOLVED_SECTIONS(INTRODUCTION_PATH),
+    Optional('glossary', default = []): _RESOLVED_GLOSSARY,
     Optional('references', default = []): _REFERENCE_IDS,
-    Optional('annexes', default = []): _SECTION_IDS(ANNEX_PATH),
+    Optional('annexes', default = []): _RESOLVED_SECTIONS(ANNEX_PATH),
 })
 
 REQUIREMENT = lambda file: Map({
@@ -58,7 +58,8 @@ REQUIREMENT = lambda file: Map({
     Optional('description', default = ""): Str(),
     'threshold': _REQUIREMENT_PART(file),
     "goal": _REQUIREMENT_PART(file),
-    Optional('glossary', default = []): _GLOSSARY_IDS,
+    Optional('dependencies', default = []): _REFS(REQUIREMENT_PATH),
+    Optional('glossary', default = []): _RESOLVED_GLOSSARY,
     Optional('references', default = []): _REFERENCE_IDS,
     Optional('metadata', default = {}): EmptyDict(), # todo: add metadata schema
     Optional('legacy', default = None): EmptyDict() | Map({
