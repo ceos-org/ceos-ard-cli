@@ -1,7 +1,7 @@
 from strictyaml import  Map, Str, Seq, UniqueSeq, EmptyList, Optional, NullNone, EmptyDict
-from .yaml.id_reference import IdReference
-from .yaml.md_reference import MdReference
-from .yaml.markdown import Markdown
+from .strictyaml.id_reference import IdReference
+from .strictyaml.md_reference import MdReference
+from .strictyaml.markdown import Markdown
 
 REFERENCE_PATH = "./references/{id}.bib"
 GLOSSARY_PATH = "./glossary/{id}.yaml"
@@ -58,7 +58,7 @@ REQUIREMENT = lambda file: Map({
     Optional('description', default = ""): Str(),
     'threshold': _REQUIREMENT_PART(file),
     "goal": _REQUIREMENT_PART(file),
-    Optional('dependencies', default = []): _REFS(REQUIREMENT_PATH),
+    Optional('dependencies', default = []): _REFS(REQUIREMENT_PATH, REQUIREMENT),
     Optional('glossary', default = []): _RESOLVED_GLOSSARY,
     Optional('references', default = []): _REFERENCE_IDS,
     Optional('metadata', default = {}): EmptyDict(), # todo: add metadata schema

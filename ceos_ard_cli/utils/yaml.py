@@ -1,8 +1,12 @@
 import strictyaml
 
+from ..utils.files import read_file
+
 def read_yaml(file, schema):
-    with open(file, 'r', encoding="utf-8") as f:
-        return to_py(strictyaml.load(f.read(), schema(file)))
+    yaml = read_file(file)
+    if not schema:
+        raise(ValueError(f"Schema is not provided for {file}"))
+    return to_py(strictyaml.load(yaml, schema(file)))
 
 def to_py(data):
     if isinstance(data, strictyaml.Map):

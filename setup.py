@@ -24,7 +24,8 @@ setup(
         "strictyaml>=1.7.0",
         "jinja2>=3.1.0",
         "click>=8.0.0",
-        "weasyprint>=64.0"
+        "weasyprint>=64.0",
+        "bibtexparser==2.0.0b8"
     ],
     extras_require={},
     packages=find_packages(),

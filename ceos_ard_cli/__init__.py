@@ -74,14 +74,13 @@ def generate_all(output, pdf):
         sys.exit(1)
 
 @click.command()
-@click.option('--verbose', '-v', is_flag=True, default=False, help='Print more information')
-def validate(verbose):
+def validate():
     """
     Validates (most of) the building blocks.
     """
     print(f"CEOS-ARD CLI {__version__} - Validate building blocks\n")
     try:
-        validate_(verbose)
+        validate_()
     except Exception as e:
         print(e)
         sys.exit(1)

@@ -1,5 +1,7 @@
 import strictyaml
 
+from ..utils.files import read_file
+
 class MdReference(strictyaml.ScalarValidator):
     def __init__(self, file):
         self._base_path = file.parent
@@ -14,8 +16,7 @@ class MdReference(strictyaml.ScalarValidator):
         if not file.exists():
             chunk.expecting_but_found(f"when expecting a file at {file} for include '{name}'")
 
-        with open(file, 'r', encoding="utf-8") as f:
-            return f.read() # todo: validate markdown
+        return read_file(file) # todo: validate markdown
 
     def to_yaml(self, data):
         return data

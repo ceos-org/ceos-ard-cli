@@ -1,8 +1,7 @@
 import pathlib as path
 
-from jinja2 import Environment
-from .schema import AUTHORS, PFS_DOCUMENT, REQUIREMENTS
-from .yaml.yaml_util import read_yaml
+from ..schema import AUTHORS, PFS_DOCUMENT, REQUIREMENTS
+from .yaml import read_yaml
 
 def check_pfs(pfs):
     document = path.Path(f"./pfs/{pfs}/document.yaml")
@@ -25,24 +24,3 @@ def read_pfs(pfs):
     data['authors'] = read_yaml(authors, AUTHORS)
     data['requirements'] = read_yaml(requirements, REQUIREMENTS)
     return data
-
-def read_template():
-    file = path.Path(f"./templates/template.md")
-    if not file.exists():
-        raise ValueError(f"Template {file} does not exist.")
-
-    with open(file, 'r', encoding="utf-8") as f:
-        tpl = f.read()
-
-    env = Environment(
-        block_start_string='~(', block_end_string=')~',
-        variable_start_string='~{', variable_end_string='}~',
-        comment_start_string='~#', comment_end_string='#~',
-        trim_blocks=True,
-    )
-    env.filters['rstrip'] = lambda x: x.rstrip()
-    env.filters['slugify'] = slugify
-    return env.from_string(tpl)
-
-def slugify(text):
-    return text.replace("/", "-")

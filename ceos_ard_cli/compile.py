@@ -1,7 +1,10 @@
 import shutil
 
 from pathlib import Path
-from .util import read_pfs, read_template, slugify
+from .utils.files import read_file, write_file
+from .utils.pfs import read_pfs
+from .utils.requirement import slugify
+from .utils.template import read_template
 from .schema import REFERENCE_PATH
 
 def unique_merge(existing, additional, key = None):
@@ -43,8 +46,8 @@ def compile(pfs, out, editable = False):
     # move the glossary and references to the top level
     data = bubble_up(data)
     # write a json file for debugging
-    # with open(f"{out}.debug.json", 'w', encoding="utf-8") as f:
-    #     f.write(json.dumps(data, indent=2))
+    # import json
+    # write_file(f"{out}.debug.json", json.dumps(data, indent=2))
     # create the markfown template
     compile_markdown(data, f"{out}.md", editable)
     # write bibtex file to disk
@@ -55,13 +58,12 @@ def compile_bibtex(data, out):
     # Read references form disk
     for ref in data["references"]:
         filepath = REFERENCE_PATH.format(id=ref)
-        with open(filepath, 'r', encoding="utf-8") as f:
-            references.append(f.read())
+        bibtex = read_file(filepath)
+        references.append(bibtex)
     # Merge into a single string
-    bibtex = "\n".join(references)
+    merged_bibtex = "\n".join(references)
     # Write a single bibtex file back to disk
-    with open(out, 'w', encoding="utf-8") as f:
-        f.write(bibtex)
+    write_file(out, merged_bibtex)
 
 # make uid unique so that it can be used in multiple categories
 def create_uid(block, req_id):
@@ -107,13 +109,10 @@ def compile_markdown(data, out, editable):
                 # Update the requirements in the texts
                 update_requirement_references(req, id, ref_id)
 
-    # fill the template
+    # read, fill and write the template
     template = read_template()
     markdown = template.render(**context)
-
-    # write markdown file to disk
-    with open(out, 'w', encoding="utf-8") as f:
-        f.write(markdown)
+    write_file(out, markdown)
 
 # replace all requirement references in the texts with the resolved references
 def update_requirement_references(req, old_id, new_id):
