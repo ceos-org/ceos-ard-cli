@@ -4,7 +4,7 @@ import weasyprint
 from pathlib import Path
 from .compile import compile
 
-def generate_all(out, pdf = True):
+def generate_all(out, self_contained = True, pdf = True):
     # read all folders from the pfs folder
     pfs_folder = Path("pfs")
     errors = 0
@@ -14,31 +14,31 @@ def generate_all(out, pdf = True):
             print(pfs)
             try:
                 pfs_folder = Path(out) / pfs
-                generate(pfs, pfs_folder, pdf)
+                generate(pfs, pfs_folder, self_contained, pdf)
             except Exception as e:
                 print(f"Error generating {folder}: {e}")
                 errors += 1
 
     return errors
 
-def generate(pfs, out, pdf = True):
+def generate(pfs, out, self_contained = True, pdf = True):
     print("- Generating editable Markdown")
     compile(pfs, out, True)
 
     print("- Generating Word")
-    run_pandoc(out, "docx")
+    run_pandoc(out, "docx", self_contained)
 
     print("- Generating read-only Markdown")
     compile(pfs, out, False)
 
     print("- Generating HTML")
-    run_pandoc(out, "html")
+    run_pandoc(out, "html", self_contained)
 
     if pdf:
         print("- Generating PDF")
         weasyprint.HTML(f"{out}.html").write_pdf(f"{out}.pdf")
 
-def run_pandoc(out, format):
+def run_pandoc(out, format, self_contained = True):
     cmd = [
         "pandoc",
         f"{out}.md", # input file
@@ -54,7 +54,9 @@ def run_pandoc(out, format):
     ]
 
     if format == "html":
-        cmd.append("--mathml") # alternative: --webtex for image rendering
+        cmd.append("--mathml")
+        if self_contained:
+            cmd.append("--embed-resources=true")
     elif format == "docx":
         cmd.append("--reference-doc=templates/style.docx")
     else:
