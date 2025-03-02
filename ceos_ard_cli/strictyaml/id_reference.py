@@ -13,9 +13,9 @@ class IdReference(strictyaml.ScalarValidator):
 
     def validate_scalar(self, chunk):
         file = Path(self._path_template.format(id=chunk.contents))
+        content = None
         if not file.exists():
             chunk.expecting_but_found(f"expecting an existing file at {file} for id '{chunk.contents}'")
-
         elif file.suffix == '.yaml':
             content = read_yaml(file, self._schema)
             if 'id' not in content or len(content['id']) == 0:
