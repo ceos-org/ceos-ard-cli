@@ -1,5 +1,5 @@
 import subprocess
-import weasyprint
+from playwright.sync_api import sync_playwright
 
 from pathlib import Path
 from .compile import compile
@@ -36,7 +36,19 @@ def generate(pfs, out, self_contained = True, pdf = True):
 
     if pdf:
         print("- Generating PDF")
-        weasyprint.HTML(f"{out}.html").write_pdf(f"{out}.pdf")
+        run_playwright(out)
+
+def run_playwright(out):
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        absolute_path = Path(f"{out}.html").absolute()
+        page.goto(f"file://{absolute_path}")
+        page.pdf(
+            path=f"{out}.pdf",
+            format="A4",
+        )
+        browser.close()
 
 def run_pandoc(out, format, self_contained = True):
     cmd = [

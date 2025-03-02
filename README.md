@@ -24,13 +24,14 @@ For the `generate` and `generate-all` commands you also need the following softw
 
 - [pandoc](https://pandoc.org/) v3.6.2 (for Word + HTML generation)
 - [pandoc-crossref](https://github.com/lierdakil/pandoc-crossref) [v0.3.18.1a](https://github.com/lierdakil/pandoc-crossref/releases/tag/v0.3.18.1a) or later (for table/image/section references)
-- [weasyprint](https://doc.courtbouillon.org/weasyprint/stable/index.html) (for PDF generation)
 
 > ![NOTE]
 > The following command doesn't work yet as the package as not been published on pypi yet.
 > Please continue with the [Development](#development) instructions for now.
 
 Run `pip install ceos-ard-cli` in the CLI to install the tool.
+
+Afterwards, we also need to install a browser for PDF rendering: `playwright install chromium --with-deps`
 
 ### Execute a command
 
