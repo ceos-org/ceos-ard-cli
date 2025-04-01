@@ -3,6 +3,7 @@ from playwright.sync_api import sync_playwright
 
 from pathlib import Path
 from .compile import compile
+from .utils.files import read_file
 
 def generate_all(out, self_contained = True, pdf = True):
     # read all folders from the pfs folder
@@ -47,6 +48,9 @@ def run_playwright(out):
         page.pdf(
             path=f"{out}.pdf",
             format="A4",
+            display_header_footer=True,
+            header_template=read_file("./templates/template.header.html"),
+            footer_template=read_file("./templates/template.footer.html"),
         )
         browser.close()
 
