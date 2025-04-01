@@ -67,7 +67,7 @@ def compile_bibtex(data, out):
 
 # make uid unique so that it can be used in multiple categories
 def create_uid(block, req_id):
-    return slugify(block['category']['id'] + "-" + req_id)
+    return slugify(block['category']['id'] + "." + req_id)
 
 def compile_markdown(data, out, editable):
     # create a copy of the data for the template
