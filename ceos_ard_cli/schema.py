@@ -45,6 +45,7 @@ SECTION = lambda file: Map({
 PFS_DOCUMENT = lambda file: Map({
     'id': Str(),
     'title': Str(),
+    'version': Str(),
     'type': Str(),
     'applies_to': _MARKDOWN(file),
     Optional('introduction', default = []): _RESOLVED_SECTIONS(INTRODUCTION_PATH),
