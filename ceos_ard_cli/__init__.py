@@ -38,7 +38,8 @@ def compile(pfs, output, editable):
 @click.option('--output', '-o', default=None, help='Output file without file extension, defaults to the name of the given PFS')
 @click.option('--self-contained', '-s', is_flag=True, default=False, help='Generate self-contained HTML files')
 @click.option('--pdf', is_flag=True, default=True, help='Enable/disable PDF generation')
-def generate(pfs, output, self_contained, pdf):
+@click.option('--docx', is_flag=True, default=True, help='Enable/disable Word (docx) generation')
+def generate(pfs, output, self_contained, pdf, docx):
     """
     Generates the Word and HTML files for the given PFS.
 
@@ -50,7 +51,7 @@ def generate(pfs, output, self_contained, pdf):
         output = pfs
 
     try:
-        generate_(pfs, output, self_contained, pdf)
+        generate_(pfs, output, self_contained, pdf, docx)
     except Exception as e:
         print(e)
         sys.exit(1)
@@ -59,7 +60,9 @@ def generate(pfs, output, self_contained, pdf):
 @click.option('--output', '-o', default="", help='Output folder, defaults to the current folder')
 @click.option('--self-contained', '-s', is_flag=True, default=False, help='Generate self-contained HTML files')
 @click.option('--pdf', is_flag=True, default=True, help='Enable/disable PDF generation')
-def generate_all(output, self_contained, pdf):
+@click.option('--docx', is_flag=True, default=True, help='Enable/disable Word (docx) generation')
+@click.option('--pfs', '-p', multiple=True, help='PFS to generate, if not specified all PFS will be generated')
+def generate_all(output, self_contained, pdf, docx, pfs):
     """
     Generates all files for all PFS.
 
@@ -67,7 +70,7 @@ def generate_all(output, self_contained, pdf):
     """
     print(f"CEOS-ARD CLI {__version__} - Generate all PFS\n")
     try:
-        errors = generate_all_(output, self_contained, pdf)
+        errors = generate_all_(output, self_contained, pdf, docx, pfs)
         print()
         print(f"Done with {errors} errors")
         sys.exit(errors)

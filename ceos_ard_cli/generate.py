@@ -5,29 +5,33 @@ from pathlib import Path
 from .compile import compile
 from .utils.files import read_file
 
-def generate_all(out, self_contained = True, pdf = True):
+def generate_all(out, self_contained = True, pdf = True, docx = True, pfs_list = None):
+    pfs_list = list(pfs_list) if pfs_list is not None else []
     # read all folders from the pfs folder
     pfs_folder = Path("pfs")
     errors = 0
     for folder in pfs_folder.iterdir():
         if folder.is_dir():
             pfs = folder.stem
+            if len(pfs) != 0 and pfs not in pfs_list:
+                continue
             print(pfs)
             try:
                 pfs_folder = Path(out) / pfs
-                generate(pfs, pfs_folder, self_contained, pdf)
+                generate(pfs, pfs_folder, self_contained, pdf, docx)
             except Exception as e:
                 print(f"Error generating {folder}: {e}")
                 errors += 1
 
     return errors
 
-def generate(pfs, out, self_contained = True, pdf = True):
-    print("- Generating editable Markdown")
-    compile(pfs, out, True)
+def generate(pfs, out, self_contained = True, pdf = True, docx = True):
+    if docx:
+        print("- Generating editable Markdown")
+        compile(pfs, out, True)
 
-    print("- Generating Word")
-    run_pandoc(out, "docx", self_contained)
+        print("- Generating Word")
+        run_pandoc(out, "docx", self_contained)
 
     print("- Generating read-only Markdown")
     compile(pfs, out, False)
