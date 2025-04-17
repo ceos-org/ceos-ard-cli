@@ -13,7 +13,7 @@ def generate_all(out, self_contained = True, pdf = True, docx = True, pfs_list =
     for folder in pfs_folder.iterdir():
         if folder.is_dir():
             pfs = folder.stem
-            if len(pfs) != 0 and pfs not in pfs_list:
+            if len(pfs_list) > 0 and pfs not in pfs_list:
                 continue
             print(pfs)
             try:

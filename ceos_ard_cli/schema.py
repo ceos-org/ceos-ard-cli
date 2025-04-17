@@ -29,12 +29,14 @@ AUTHORS = lambda file: Seq(Map({
 }))
 
 GLOSSARY = lambda file: Map({
+    Optional('filepath', default=str(file)): Str(),
     'term': Str(),
     'description': _MARKDOWN(file),
 })
 _RESOLVED_GLOSSARY = _RESOLVED_REFS(GLOSSARY_PATH, GLOSSARY)
 
 SECTION = lambda file: Map({
+    Optional('filepath', default=str(file)): Str(),
     Optional('id', default = ""): Str(),
     'title': Str(),
     'description': _MARKDOWN(file),
@@ -55,6 +57,7 @@ PFS_DOCUMENT = lambda file: Map({
 })
 
 REQUIREMENT = lambda file: Map({
+    Optional('filepath', default=str(file)): Str(),
     'title': Str(),
     Optional('description', default = ""): Str(),
     'threshold': _REQUIREMENT_PART(file),
