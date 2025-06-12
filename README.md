@@ -4,6 +4,8 @@ CLI for working with the [CEOS-ARD building blocks and PFSes](https://github.com
 
 - [Getting Started](#getting-started)
   - [Installation](#installation)
+    - [Conda (recommended)](#conda-recommended)
+    - [Manual](#manual)
   - [Execute a command](#execute-a-command)
 - [Commands](#commands)
   - [`ceos-ard compile`: Compile PFS document to a Markdown file](#ceos-ard-compile-compile-pfs-document-to-a-markdown-file)
@@ -18,12 +20,15 @@ In order to make working with CEOS-ARD easier we have developed command-line int
 
 ### Installation
 
-You will need to have **Python 3.9** or any later version installed.
+#### Conda (recommended)
 
-For the `generate` and `generate-all` commands you also need the following software installed:
+Run `conda env create -f env.yml` using the env.yml in this repository.
 
-- [pandoc](https://pandoc.org/) v3.6.2 (for Word + HTML generation)
-- [pandoc-crossref](https://github.com/lierdakil/pandoc-crossref) [v0.3.18.1a](https://github.com/lierdakil/pandoc-crossref/releases/tag/v0.3.18.1a) or later (for table/image/section references)
+Afterwards, activate the environment:
+`conda activate ceos-ard-cli`
+
+We also need to install a browser for PDF rendering:
+`playwright install chromium --with-deps`
 
 > ![NOTE]
 > The following command doesn't work yet as the package as not been published on pypi yet.
@@ -31,7 +36,19 @@ For the `generate` and `generate-all` commands you also need the following softw
 
 Run `pip install ceos-ard-cli` in the CLI to install the tool.
 
-Afterwards, we also need to install a browser for PDF rendering: `playwright install chromium --with-deps`
+#### Manual
+
+You will need to have **Python 3.9** or any later version installed.
+
+For the `generate` and `generate-all` commands you also need the following software installed:
+
+- [pandoc](https://pandoc.org/) v3.6.2 (for Word + HTML generation)
+- [pandoc-crossref](https://github.com/lierdakil/pandoc-crossref) [v0.3.18.1a](https://github.com/lierdakil/pandoc-crossref/releases/tag/v0.3.18.1a) or later (for table/image/section references)
+
+Run `pip install ceos-ard-cli` in the CLI to install the tool.
+
+We also need to install a browser for PDF rendering:
+`playwright install chromium --with-deps`
 
 ### Execute a command
 
