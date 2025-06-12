@@ -10,6 +10,9 @@ ANNEX_PATH = "./sections/annexes/{id}.yaml"
 REQUIREMENT_CATEGORY_PATH = "./sections/requirement-categories/{id}.yaml"
 REQUIREMENT_PATH = "./requirements/{id}.yaml"
 
+def fix_path(path):
+    return str(path).replace('\\', '/')
+
 _REFS = lambda path, schema = None, resolve = False: EmptyList() | UniqueSeq(IdReference(path, schema, resolve))
 _RESOLVED_REFS = lambda path, schema: _REFS(path, schema, resolve = True)
 _RESOLVED_SECTIONS = lambda path: _RESOLVED_REFS(path, SECTION)
@@ -29,14 +32,14 @@ AUTHORS = lambda file: Seq(Map({
 }))
 
 GLOSSARY = lambda file: Map({
-    Optional('filepath', default=str(file)): Str(),
+    Optional('filepath', default=fix_path(file)): Str(),
     'term': Str(),
     'description': _MARKDOWN(file),
 })
 _RESOLVED_GLOSSARY = _RESOLVED_REFS(GLOSSARY_PATH, GLOSSARY)
 
 SECTION = lambda file: Map({
-    Optional('filepath', default=str(file)): Str(),
+    Optional('filepath', default=fix_path(file)): Str(),
     Optional('id', default = ""): Str(),
     'title': Str(),
     'description': _MARKDOWN(file),
@@ -57,7 +60,7 @@ PFS_DOCUMENT = lambda file: Map({
 })
 
 REQUIREMENT = lambda file: Map({
-    Optional('filepath', default=str(file)): Str(),
+    Optional('filepath', default=fix_path(file)): Str(),
     'title': Str(),
     Optional('description', default = ""): Str(),
     'threshold': _REQUIREMENT_PART(file),
