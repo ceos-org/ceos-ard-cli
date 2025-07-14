@@ -30,7 +30,7 @@ Afterwards, activate the environment:
 We also need to install a browser for PDF rendering:
 `playwright install chromium --with-deps`
 
-> ![NOTE]
+> [!NOTE]
 > The following command doesn't work yet as the package as not been published on pypi yet.
 > Please continue with the [Development](#development) instructions for now.
 
