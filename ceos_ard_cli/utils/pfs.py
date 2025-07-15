@@ -3,6 +3,7 @@ import pathlib as path
 from ..schema import AUTHORS, PFS_DOCUMENT, REQUIREMENTS
 from .yaml import read_yaml
 
+
 def check_pfs(pfs):
     document = path.Path(f"./pfs/{pfs}/document.yaml")
     if not document.exists():
@@ -18,9 +19,10 @@ def check_pfs(pfs):
 
     return document, authors, requirements
 
+
 def read_pfs(pfs):
     document, authors, requirements = check_pfs(pfs)
     data = read_yaml(document, PFS_DOCUMENT)
-    data['authors'] = read_yaml(authors, AUTHORS)
-    data['requirements'] = read_yaml(requirements, REQUIREMENTS)
+    data["authors"] = read_yaml(authors, AUTHORS)
+    data["requirements"] = read_yaml(requirements, REQUIREMENTS)
     return data

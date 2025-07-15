@@ -2,22 +2,25 @@ from pathlib import Path
 
 FILE_CACHE = {}
 
+
 def read_file(file):
     filepath = Path(file)
     key = str(filepath.absolute())
     if key in FILE_CACHE:
         return FILE_CACHE[key]
 
-    with open(filepath, 'r', encoding="utf-8") as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         content = f.read()
         FILE_CACHE[key] = content
         return content
 
+
 def write_file(file, content):
-    with open(file, 'w', encoding="utf-8") as f:
+    with open(file, "w", encoding="utf-8") as f:
         return f.write(content)
 
-def get_all_folders(folder, deep = True):
+
+def get_all_folders(folder, deep=True):
     folders = []
     for f in Path(folder).iterdir():
         if f.is_dir():
@@ -27,7 +30,8 @@ def get_all_folders(folder, deep = True):
 
     return folders
 
-def get_all_files(folder, ext = '.yaml', deep = True):
+
+def get_all_files(folder, ext=".yaml", deep=True):
     if isinstance(folder, list):
         files = []
         for f in folder:

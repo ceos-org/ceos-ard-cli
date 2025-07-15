@@ -1,0 +1,64 @@
+[project]
+name = "ceos-ard-cli"
+dynamic = ["version"]
+description = "CLI tools for CEOS-ARD"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Matthias Mohr" }]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+]
+dependencies = [
+    "strictyaml>=1.7.0",
+    "jinja2>=3.1.0",
+    "click>=8.0.0",
+    "playwright>=1.50.0",
+    "bibtexparser==2.0.0b8",
+]
+
+[project.urls]
+Homepage = "https://github.com/ceos-org/ceos-ard-cli"
+Repository = "https://github.com/ceos-org/ceos-ard-cli"
+
+[project.scripts]
+ceos-ard = "ceos_ard_cli:cli"
+
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "ceos_ard_cli/version.py"
+
+[tool.pixi.project]
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
+
+[tool.pixi.dependencies]
+python = ">=3.9"
+pandoc = "==3.6.2"
+pandoc-crossref = "=0.3.18.1" # Should be v0.3.18.1a, but not available in conda-forge
+pip = "*"
+
+[tool.pixi.pypi-dependencies]
+ceos-ard-cli = { path = ".", editable = true }
+
+[tool.pixi.feature.dev.dependencies]
+ruff = ">=0.1,<1.0"
+pre-commit = ">=4.0,<=5.0"
+
+[tool.pixi.environments]
+default = {solve-group = "default"}
+dev = {features = ["dev"], solve-group = "default"}
+
+[tool.pixi.tasks]
+install-browser = "playwright install chromium --with-deps"
+build = "python -m build"
+format = "ruff format ceos_ard_cli/"
+lint = "ruff check ceos_ard_cli/ --fix --select I"
+check-all = {depends-on = ["format", "lint"]}
+install-dev = "python -m pip install -e ."
+

@@ -1,11 +1,13 @@
 import subprocess
+from pathlib import Path
+
 from playwright.sync_api import sync_playwright
 
-from pathlib import Path
 from .compile import compile
 from .utils.files import read_file
 
-def generate_all(out, self_contained = True, pdf = True, docx = True, pfs_list = None):
+
+def generate_all(out, self_contained=True, pdf=True, docx=True, pfs_list=None):
     pfs_list = list(pfs_list) if pfs_list is not None else []
     # read all folders from the pfs folder
     pfs_folder = Path("pfs")
@@ -25,7 +27,8 @@ def generate_all(out, self_contained = True, pdf = True, docx = True, pfs_list =
 
     return errors
 
-def generate(pfs, out, self_contained = True, pdf = True, docx = True):
+
+def generate(pfs, out, self_contained=True, pdf=True, docx=True):
     if docx:
         print("- Generating editable Markdown")
         compile(pfs, out, True)
@@ -43,6 +46,7 @@ def generate(pfs, out, self_contained = True, pdf = True, docx = True):
         print("- Generating PDF")
         run_playwright(out)
 
+
 def run_playwright(out):
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -58,19 +62,25 @@ def run_playwright(out):
         )
         browser.close()
 
-def run_pandoc(out, format, self_contained = True):
+
+def run_pandoc(out, format, self_contained=True):
     cmd = [
         "pandoc",
-        f"{out}.md", # input file
-        "-s", # standalone
-        "-o", f"{out}.{format}", # output file
-        "-t", format, # output format
-        "-F", "pandoc-crossref", # enable cross-references, must be before -C: https://lierdakil.github.io/pandoc-crossref/#citeproc-and-pandoc-crossref
-        "-C", # enable citation processing
-        f"--bibliography={out}.bib", # bibliography file
-        "-L", "templates/no-sectionnumbers.lua", # remove section numbers from reference links
-        "-L", "templates/pagebreak.lua", # page breaks
-        f"--template=templates/template.{format}", # template
+        f"{out}.md",  # input file
+        "-s",  # standalone
+        "-o",
+        f"{out}.{format}",  # output file
+        "-t",
+        format,  # output format
+        "-F",
+        "pandoc-crossref",  # enable cross-references, must be before -C: https://lierdakil.github.io/pandoc-crossref/#citeproc-and-pandoc-crossref
+        "-C",  # enable citation processing
+        f"--bibliography={out}.bib",  # bibliography file
+        "-L",
+        "templates/no-sectionnumbers.lua",  # remove section numbers from reference links
+        "-L",
+        "templates/pagebreak.lua",  # page breaks
+        f"--template=templates/template.{format}",  # template
     ]
 
     if format == "html":

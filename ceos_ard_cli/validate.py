@@ -1,13 +1,14 @@
-from .utils.files import get_all_files, get_all_folders, FILE_CACHE
+from .utils.files import FILE_CACHE, get_all_files, get_all_folders
 from .utils.pfs import read_pfs
 from .utils.template import read_template
 
-def log(id, error = None):
+
+def log(id, error=None):
     message = str(error) if error is not None else "OK"
     print(f"- {id}: {message}")
 
-def validate():
 
+def validate():
     # Validate PFS template
     print("Validating PFS template (basic checks only)")
     error = None

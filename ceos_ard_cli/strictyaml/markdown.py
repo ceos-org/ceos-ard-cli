@@ -1,9 +1,9 @@
 import strictyaml
 
-class Markdown(strictyaml.Str):
 
+class Markdown(strictyaml.Str):
     def validate_scalar(self, chunk):
-        if chunk.contents.startswith('include:'):
+        if chunk.contents.startswith("include:"):
             chunk.expecting_but_found(f"when NOT expecting an include")
 
         # ToDo: Validate markdown
