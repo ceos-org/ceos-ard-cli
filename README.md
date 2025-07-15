@@ -85,4 +85,5 @@ Check `ceos-ard validate --help` (or `ceos-ard validate --help`) for more detail
 5. Install dependencies and set up the development environment: `pixi run install-dev`
 6. Switch into the development envionment: `pixi shell -e dev`
 7. You can now run the CLI in development mode as normal.
-8. Install pre-commit hooks (`pre-commit install`) to run tests and linting on each commit or run it manually (`pre-commit run --all-files`)
+8. Run the checks (lint, format, tests) through `pixi run check-all`
+9. Optionally, you can install pre-commit hooks (`pre-commit install`) to run lint and format automatically for each commit.

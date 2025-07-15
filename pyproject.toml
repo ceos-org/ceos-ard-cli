@@ -1,7 +1,7 @@
 [project]
 name = "ceos-ard-cli"
 dynamic = ["version"]
-description = "CLI tools for CEOS-ARD"
+description = "CLI tools for CEOS-ARD to generate and validate PFS documents"
 readme = "README.md"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Matthias Mohr" }]
@@ -22,7 +22,14 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/ceos-org/ceos-ard-cli"
 Repository = "https://github.com/ceos-org/ceos-ard-cli"
+Issues = "https://github.com/ceos-org/ceos-ard-cli/issues"
 
+[project.optional-dependencies]
+dev = [
+    "ruff",        # Code formatting tool
+    "pytest",      # Testing framework
+    "pre-commit",  # Run tests on commit
+]
 [project.scripts]
 ceos-ard = "ceos_ard_cli:cli"
 
@@ -48,6 +55,7 @@ ceos-ard-cli = { path = ".", editable = true }
 
 [tool.pixi.feature.dev.dependencies]
 ruff = ">=0.1,<1.0"
+pytest = ">=7.4,<9.0"
 pre-commit = ">=4.0,<=5.0"
 
 [tool.pixi.environments]
@@ -59,6 +67,7 @@ install-browser = "playwright install chromium --with-deps"
 build = "python -m build"
 format = "ruff format ceos_ard_cli/"
 lint = "ruff check ceos_ard_cli/ --fix --select I"
-check-all = {depends-on = ["format", "lint"]}
+test = "pytest tests/"
+check-all = {depends-on = ["format", "lint", "test"]}
 install-dev = "python -m pip install -e ."
 
