@@ -6,10 +6,8 @@ repos:
       name: pixi lint
       entry: pixi run lint
       language: system
-      files: \.py$
     # Run the formatter via Pixi
     - id: pixi-format
       name: pixi format
       entry: pixi run format
       language: system
-      files: \.py$
