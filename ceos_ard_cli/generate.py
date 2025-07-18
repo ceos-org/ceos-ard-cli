@@ -20,7 +20,7 @@ def generate_all(output_dir, input_dir=None, self_contained=True, pdf=True, docx
             print(pfs)
             try:
                 output_pfs_folder = Path(output_dir) / pfs
-                generate(pfs, output_pfs_folder, self_contained, pdf, docx)
+                generate(pfs, output_pfs_folder, self_contained, pdf, docx, input_dir=input_dir)
             except Exception as e:
                 print(f"Error generating {folder}: {e}")
                 errors += 1
@@ -28,16 +28,16 @@ def generate_all(output_dir, input_dir=None, self_contained=True, pdf=True, docx
     return errors
 
 
-def generate(pfs, output_pfs_folder, self_contained=True, pdf=True, docx=True):
+def generate(pfs, output_pfs_folder, self_contained=True, pdf=True, docx=True, input_dir=None):
     if docx:
         print("- Generating editable Markdown")
-        compile(pfs, output_pfs_folder, True)
+        compile(pfs, output_pfs_folder, True, input_dir=input_dir)
 
         print("- Generating Word")
         run_pandoc(output_pfs_folder, "docx", self_contained)
 
     print("- Generating read-only Markdown")
-    compile(pfs, output_pfs_folder, False)
+    compile(pfs, output_pfs_folder, False, input_dir=input_dir)
 
     print("- Generating HTML")
     run_pandoc(output_pfs_folder, "html", self_contained)
