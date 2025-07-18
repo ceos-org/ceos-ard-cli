@@ -7,20 +7,20 @@ from .compile import compile
 from .utils.files import read_file
 
 
-def generate_all(out, self_contained=True, pdf=True, docx=True, pfs_list=None):
+def generate_all(output, input_dir=None, self_contained=True, pdf=True, docx=True, pfs_list=None):
     pfs_list = list(pfs_list) if pfs_list is not None else []
     # read all folders from the pfs folder
-    pfs_folder = Path("pfs")
+    input_dir = Path(input_dir) if input_dir is not None else Path("./")
+    input_pfs_folder = input_dir / "pfs"
     errors = 0
-    for folder in pfs_folder.iterdir():
+    for folder in input_pfs_folder.iterdir():
         if folder.is_dir():
             pfs = folder.stem
             if len(pfs_list) > 0 and pfs not in pfs_list:
                 continue
             print(pfs)
             try:
-                pfs_folder = Path(out) / pfs
-                generate(pfs, pfs_folder, self_contained, pdf, docx)
+                generate(pfs, output, input_dir, self_contained, pdf, docx,)
             except Exception as e:
                 print(f"Error generating {folder}: {e}")
                 errors += 1
@@ -28,23 +28,25 @@ def generate_all(out, self_contained=True, pdf=True, docx=True, pfs_list=None):
     return errors
 
 
-def generate(pfs, out, self_contained=True, pdf=True, docx=True):
+def generate(pfs, output, input_dir, self_contained=True, pdf=True, docx=True):
+    output_pfs_folder = Path(output) / pfs
+
     if docx:
         print("- Generating editable Markdown")
-        compile(pfs, out, True)
+        compile(pfs, output_pfs_folder, True, input_dir=input_dir)
 
         print("- Generating Word")
-        run_pandoc(out, "docx", self_contained)
+        run_pandoc(output_pfs_folder, "docx", self_contained)
 
     print("- Generating read-only Markdown")
-    compile(pfs, out, False)
+    compile(pfs, output_pfs_folder, False, input_dir=input_dir)
 
     print("- Generating HTML")
-    run_pandoc(out, "html", self_contained)
+    run_pandoc(output_pfs_folder, "html", self_contained)
 
     if pdf:
         print("- Generating PDF")
-        run_playwright(out)
+        run_playwright(output_pfs_folder)
 
 
 def run_playwright(out):

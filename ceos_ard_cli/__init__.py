@@ -58,6 +58,12 @@ def compile(pfs, output, editable):
     help="Output file without file extension, defaults to the name of the given PFS",
 )
 @click.option(
+    "--input-dir",
+    "-i",
+    default=None,
+    help="Input directory for PFS files, defaults to the current folder",
+)
+@click.option(
     "--self-contained",
     "-s",
     is_flag=True,
@@ -68,7 +74,7 @@ def compile(pfs, output, editable):
 @click.option(
     "--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation"
 )
-def generate(pfs, output, self_contained, pdf, docx):
+def generate(pfs, output, input_dir, self_contained, pdf, docx):
     """
     Generates the Word and HTML files for the given PFS.
 
@@ -80,7 +86,7 @@ def generate(pfs, output, self_contained, pdf, docx):
         output = pfs
 
     try:
-        generate_(pfs, output, self_contained, pdf, docx)
+        generate_(pfs, output, input_dir, self_contained, pdf, docx)
     except Exception as e:
         print(e)
         sys.exit(1)
@@ -88,7 +94,14 @@ def generate(pfs, output, self_contained, pdf, docx):
 
 @click.command()
 @click.option(
-    "--output", "-o", default="", help="Output folder, defaults to the current folder"
+    "--output", "-o", default="", help="Output directory for PFS files, defaults to the current folder"
+)
+@click.option(
+    "--input-dir",
+    "-i",
+    type=str,
+    default=None,
+    help="Input directory for PFS files, defaults to the current folder",
 )
 @click.option(
     "--self-contained",
@@ -107,7 +120,7 @@ def generate(pfs, output, self_contained, pdf, docx):
     multiple=True,
     help="PFS to generate, if not specified all PFS will be generated",
 )
-def generate_all(output, self_contained, pdf, docx, pfs):
+def generate_all(output, input_dir, self_contained, pdf, docx, pfs):
     """
     Generates all files for all PFS.
 
@@ -115,7 +128,7 @@ def generate_all(output, self_contained, pdf, docx, pfs):
     """
     print(f"CEOS-ARD CLI {__version__} - Generate all PFS\n")
     try:
-        errors = generate_all_(output, self_contained, pdf, docx, pfs)
+        errors = generate_all_(output, input_dir, self_contained, pdf, docx, pfs)
         print()
         print(f"Done with {errors} errors")
         sys.exit(errors)

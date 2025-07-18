@@ -37,16 +37,21 @@ def _bubble_up(data, root):
     return root
 
 
-def compile(pfs, out, editable=False):
+def compile(pfs, out, editable=False, input_dir=None):
     folder = Path(out).parent
     # create folder if needed
     folder.mkdir(parents=True, exist_ok=True)
     # copy assets if needed
     assets = folder / "assets"
-    if not assets.exists():
-        shutil.copytree(Path("assets"), assets)
+    # set the source assets path
+    # if input_dir is None, use the default assets path
+    # if input_dir is provided, use the assets path in the input directory
+    source_assets = Path(input_dir) / "assets" if input_dir else Path("./assets")
+    # if the assets folder does not exist, copy the source assets to the output folder
+    if not assets.exists() and source_assets.exists():
+        shutil.copytree(source_assets, assets)
     # read the PFS information
-    data = read_pfs(pfs)
+    data = read_pfs(pfs, input_dir=input_dir)
     # move the glossary and references to the top level
     data = bubble_up(data)
     # write a json file for debugging
