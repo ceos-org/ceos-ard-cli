@@ -19,8 +19,7 @@ def generate_all(output_dir, input_dir=None, self_contained=True, pdf=True, docx
                 continue
             print(pfs)
             try:
-                output_pfs_folder = Path(output_dir) / pfs
-                generate(pfs, output_pfs_folder, self_contained, pdf, docx, input_dir=input_dir)
+                generate(pfs, output_dir, self_contained, pdf, docx, input_dir=input_dir)
             except Exception as e:
                 print(f"Error generating {folder}: {e}")
                 errors += 1
@@ -28,7 +27,8 @@ def generate_all(output_dir, input_dir=None, self_contained=True, pdf=True, docx
     return errors
 
 
-def generate(pfs, output_pfs_folder, self_contained=True, pdf=True, docx=True, input_dir=None):
+def generate(pfs, output_dir, self_contained=True, pdf=True, docx=True, input_dir=None):
+    output_pfs_folder = Path(output_dir) / pfs
     if docx:
         print("- Generating editable Markdown")
         compile(pfs, output_pfs_folder, True, input_dir=input_dir)
