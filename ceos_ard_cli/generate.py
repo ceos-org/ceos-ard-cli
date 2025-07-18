@@ -7,10 +7,11 @@ from .compile import compile
 from .utils.files import read_file
 
 
-def generate_all(output_dir, input_dir=None, self_contained=True, pdf=True, docx=True, pfs_list=None):
+def generate_all(output, input_dir=None, self_contained=True, pdf=True, docx=True, pfs_list=None):
     pfs_list = list(pfs_list) if pfs_list is not None else []
     # read all folders from the pfs folder
-    input_pfs_folder = Path(input_dir) if input_dir is not None else Path("./pfs")
+    input_dir = Path(input_dir) if input_dir is not None else Path("./")
+    input_pfs_folder = input_dir / "pfs"
     errors = 0
     for folder in input_pfs_folder.iterdir():
         if folder.is_dir():
@@ -19,7 +20,7 @@ def generate_all(output_dir, input_dir=None, self_contained=True, pdf=True, docx
                 continue
             print(pfs)
             try:
-                generate(pfs, output_dir, self_contained, pdf, docx, input_dir=input_dir)
+                generate(pfs, output, input_dir, self_contained, pdf, docx,)
             except Exception as e:
                 print(f"Error generating {folder}: {e}")
                 errors += 1
@@ -27,8 +28,9 @@ def generate_all(output_dir, input_dir=None, self_contained=True, pdf=True, docx
     return errors
 
 
-def generate(pfs, output_dir, self_contained=True, pdf=True, docx=True, input_dir=None):
-    output_pfs_folder = Path(output_dir) / pfs
+def generate(pfs, output, input_dir, self_contained=True, pdf=True, docx=True):
+    output_pfs_folder = Path(output) / pfs
+
     if docx:
         print("- Generating editable Markdown")
         compile(pfs, output_pfs_folder, True, input_dir=input_dir)
