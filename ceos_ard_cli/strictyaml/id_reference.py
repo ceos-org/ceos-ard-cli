@@ -43,7 +43,6 @@ class IdReference(strictyaml.ScalarValidator):
             content = read_file(file)
 
         if self._resolve:
-            print(f"Resolving reference for: {chunk.contents}")
             return content
         else:
             return chunk.contents
