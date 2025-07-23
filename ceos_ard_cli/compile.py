@@ -37,7 +37,7 @@ def _bubble_up(data, root):
     return root
 
 
-def compile(pfs, out, editable=False, input_dir=None):
+def compile(pfs, out, input_dir, editable=False):
     folder = Path(out).parent
     # create folder if needed
     folder.mkdir(parents=True, exist_ok=True)
@@ -51,23 +51,23 @@ def compile(pfs, out, editable=False, input_dir=None):
     if not assets.exists() and source_assets.exists():
         shutil.copytree(source_assets, assets)
     # read the PFS information
-    data = read_pfs(pfs, input_dir=input_dir)
+    data = read_pfs(pfs, input_dir)
     # move the glossary and references to the top level
     data = bubble_up(data)
     # write a json file for debugging
     # import json
     # write_file(f"{out}.debug.json", json.dumps(data, indent=2))
     # create the markfown template
-    compile_markdown(data, f"{out}.md", editable)
+    compile_markdown(data, f"{out}.md", editable, input_dir)
     # write bibtex file to disk
-    compile_bibtex(data, f"{out}.bib")
+    compile_bibtex(data, f"{out}.bib", input_dir)
 
 
-def compile_bibtex(data, out):
+def compile_bibtex(data, out, input_dir):
     references = []
     # Read references form disk
     for ref in data["references"]:
-        filepath = REFERENCE_PATH.format(id=ref)
+        filepath = Path(input_dir) / REFERENCE_PATH.format(id=ref)
         bibtex = read_file(filepath)
         references.append(bibtex)
     # Merge into a single string
@@ -81,7 +81,7 @@ def create_uid(block, req_id):
     return slugify(block["category"]["id"] + "." + req_id)
 
 
-def compile_markdown(data, out, editable):
+def compile_markdown(data, out, editable, input_dir):
     # create a copy of the data for the template
     context = data.copy()
 
@@ -124,7 +124,7 @@ def compile_markdown(data, out, editable):
                 update_requirement_references(req, id, ref_id)
 
     # read, fill and write the template
-    template = read_template()
+    template = read_template(input_dir)
     markdown = template.render(**context)
     write_file(out, markdown)
 

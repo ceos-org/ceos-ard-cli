@@ -4,8 +4,8 @@ from ..schema import AUTHORS, PFS_DOCUMENT, REQUIREMENTS
 from .yaml import read_yaml
 
 
-def check_pfs(pfs, input_dir: path):
-    pfs_folder = path.Path(input_dir) / "pfs" / pfs
+def check_pfs(pfs, base_path: path):
+    pfs_folder = base_path / "pfs" / pfs
 
     if not pfs_folder.exists():
         raise ValueError(f"PFS base directory {pfs_folder} does not exist.")
@@ -26,9 +26,10 @@ def check_pfs(pfs, input_dir: path):
 
 
 def read_pfs(pfs, input_dir: path):
-    document, authors, requirements = check_pfs(pfs, input_dir)
+    base_path = path.Path(input_dir)
+    document, authors, requirements = check_pfs(pfs, base_path)
 
-    data = read_yaml(document, PFS_DOCUMENT)
-    data["authors"] = read_yaml(authors, AUTHORS)
-    data["requirements"] = read_yaml(requirements, REQUIREMENTS)
+    data = read_yaml(document, PFS_DOCUMENT, base_path)
+    data["authors"] = read_yaml(authors, AUTHORS, base_path)
+    data["requirements"] = read_yaml(requirements, REQUIREMENTS, base_path)
     return data

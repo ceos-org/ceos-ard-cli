@@ -7,7 +7,7 @@ from .compile import compile
 from .utils.files import read_file
 
 
-def generate_all(output, input_dir=None, self_contained=True, pdf=True, docx=True, pfs_list=None):
+def generate_all(output, input_dir, self_contained=True, pdf=True, docx=True, pfs_list=None):
     pfs_list = list(pfs_list) if pfs_list is not None else []
     # read all folders from the pfs folder
     input_dir = Path(input_dir) if input_dir is not None else Path("./")
@@ -33,23 +33,23 @@ def generate(pfs, output, input_dir, self_contained=True, pdf=True, docx=True):
 
     if docx:
         print("- Generating editable Markdown")
-        compile(pfs, output_pfs_folder, True, input_dir=input_dir)
+        compile(pfs, output_pfs_folder, input_dir, True)
 
         print("- Generating Word")
-        run_pandoc(output_pfs_folder, "docx", self_contained)
+        run_pandoc(output_pfs_folder, "docx", input_dir, self_contained)
 
     print("- Generating read-only Markdown")
-    compile(pfs, output_pfs_folder, False, input_dir=input_dir)
+    compile(pfs, output_pfs_folder, input_dir, False)
 
     print("- Generating HTML")
-    run_pandoc(output_pfs_folder, "html", self_contained)
+    run_pandoc(output_pfs_folder, "html", input_dir, self_contained)
 
     if pdf:
         print("- Generating PDF")
-        run_playwright(output_pfs_folder)
+        run_playwright(output_pfs_folder, input_dir)
 
 
-def run_playwright(out):
+def run_playwright(out, input_dir):
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
@@ -59,13 +59,13 @@ def run_playwright(out):
             path=f"{out}.pdf",
             format="A4",
             display_header_footer=True,
-            header_template=read_file("./templates/template.header.html"),
-            footer_template=read_file("./templates/template.footer.html"),
+            header_template=read_file(f"{input_dir}/templates/template.header.html"),
+            footer_template=read_file(f"{input_dir}/templates/template.footer.html"),
         )
         browser.close()
 
 
-def run_pandoc(out, format, self_contained=True):
+def run_pandoc(out, format, input_dir, self_contained=True):
     cmd = [
         "pandoc",
         f"{out}.md",  # input file
@@ -79,10 +79,10 @@ def run_pandoc(out, format, self_contained=True):
         "-C",  # enable citation processing
         f"--bibliography={out}.bib",  # bibliography file
         "-L",
-        "templates/no-sectionnumbers.lua",  # remove section numbers from reference links
+        f"{input_dir}/templates/no-sectionnumbers.lua",  # remove section numbers from reference links
         "-L",
-        "templates/pagebreak.lua",  # page breaks
-        f"--template=templates/template.{format}",  # template
+        f"{input_dir}/templates/pagebreak.lua",  # page breaks
+        f"--template={input_dir}/templates/template.{format}",  # template
     ]
 
     if format == "html":
@@ -90,7 +90,7 @@ def run_pandoc(out, format, self_contained=True):
         if self_contained:
             cmd.append("--embed-resources=true")
     elif format == "docx":
-        cmd.append("--reference-doc=templates/style.docx")
+        cmd.append(f"--reference-doc={input_dir}/templates/style.docx")
     else:
         raise ValueError(f"Unsupported format {format}")
 
