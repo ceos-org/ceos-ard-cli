@@ -29,7 +29,7 @@ def generate_all(output, input_dir, self_contained=True, pdf=True, docx=True, pf
 
 
 def generate(pfs, output, input_dir, self_contained=True, pdf=True, docx=True):
-    output_pfs_folder = Path(output) / pfs
+    output_pfs_folder = (Path(output) / pfs).absolute()
 
     if docx:
         print("- Generating editable Markdown")
@@ -79,10 +79,10 @@ def run_pandoc(out, format, input_dir, self_contained=True):
         "-C",  # enable citation processing
         f"--bibliography={out}.bib",  # bibliography file
         "-L",
-        f"{input_dir}/templates/no-sectionnumbers.lua",  # remove section numbers from reference links
+        "templates/no-sectionnumbers.lua",  # remove section numbers from reference links
         "-L",
-        f"{input_dir}/templates/pagebreak.lua",  # page breaks
-        f"--template={input_dir}/templates/template.{format}",  # template
+        "templates/pagebreak.lua",  # page breaks
+        f"--template=templates/template.{format}",  # template
     ]
 
     if format == "html":
@@ -94,4 +94,4 @@ def run_pandoc(out, format, input_dir, self_contained=True):
     else:
         raise ValueError(f"Unsupported format {format}")
 
-    subprocess.run(cmd)
+    subprocess.run(cmd, cwd=input_dir)
