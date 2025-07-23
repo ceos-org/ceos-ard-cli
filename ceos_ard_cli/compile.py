@@ -42,14 +42,11 @@ def compile(pfs, out, input_dir, editable=False):
     # create folder if needed
     folder.mkdir(parents=True, exist_ok=True)
     # copy assets if needed
-    assets = folder / "assets"
-    # set the source assets path
-    # if input_dir is None, use the default assets path
-    # if input_dir is provided, use the assets path in the input directory
-    source_assets = Path(input_dir) / "assets" if input_dir else Path("./assets")
-    # if the assets folder does not exist, copy the source assets to the output folder
-    if not assets.exists() and source_assets.exists():
-        shutil.copytree(source_assets, assets)
+    assets_target = folder / "assets"
+    input_dir = Path(input_dir or ".")
+    assets_source = input_dir / "assets"
+    if not assets_target.exists():
+        shutil.copytree(assets_source, assets_target)
     # read the PFS information
     data = read_pfs(pfs, input_dir)
     # move the glossary and references to the top level
@@ -63,11 +60,11 @@ def compile(pfs, out, input_dir, editable=False):
     compile_bibtex(data, f"{out}.bib", input_dir)
 
 
-def compile_bibtex(data, out, input_dir):
+def compile_bibtex(data, out, input_dir: Path):
     references = []
     # Read references form disk
     for ref in data["references"]:
-        filepath = Path(input_dir) / REFERENCE_PATH.format(id=ref)
+        filepath = input_dir / REFERENCE_PATH.format(id=ref)
         bibtex = read_file(filepath)
         references.append(bibtex)
     # Merge into a single string
@@ -81,7 +78,7 @@ def create_uid(block, req_id):
     return slugify(block["category"]["id"] + "." + req_id)
 
 
-def compile_markdown(data, out, editable, input_dir):
+def compile_markdown(data, out, editable, input_dir: Path):
     # create a copy of the data for the template
     context = data.copy()
 

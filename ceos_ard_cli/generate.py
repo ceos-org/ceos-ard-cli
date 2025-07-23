@@ -10,7 +10,7 @@ from .utils.files import read_file
 def generate_all(output, input_dir, self_contained=True, pdf=True, docx=True, pfs_list=None):
     pfs_list = list(pfs_list) if pfs_list is not None else []
     # read all folders from the pfs folder
-    input_dir = Path(input_dir) if input_dir is not None else Path("./")
+    input_dir = Path(input_dir or ".")
     input_pfs_folder = input_dir / "pfs"
     errors = 0
     for folder in input_pfs_folder.iterdir():
@@ -29,6 +29,7 @@ def generate_all(output, input_dir, self_contained=True, pdf=True, docx=True, pf
 
 
 def generate(pfs, output, input_dir, self_contained=True, pdf=True, docx=True):
+    input_dir = Path(input_dir or ".")
     output_pfs_folder = (Path(output) / pfs).absolute()
 
     if docx:
@@ -65,7 +66,7 @@ def run_playwright(out, input_dir):
         browser.close()
 
 
-def run_pandoc(out, format, input_dir, self_contained=True):
+def run_pandoc(out, format, input_dir: Path, self_contained: bool=True):
     cmd = [
         "pandoc",
         f"{out}.md",  # input file

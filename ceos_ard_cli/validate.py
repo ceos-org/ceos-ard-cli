@@ -10,6 +10,7 @@ def log(id, error=None):
 
 
 def validate(input_dir):
+    input_dir = Path(input_dir or ".")
     # Validate PFS template
     print("Validating PFS template (basic checks only)")
     error = None
@@ -24,7 +25,7 @@ def validate(input_dir):
     # Validate all PFS
     # This also validates all files that are used/referenced in the PFS
     print("Validating PFS")
-    input_pfs_folder = Path(input_dir) / "pfs"
+    input_pfs_folder = input_dir / "pfs"
     all_pfs = get_all_folders(input_pfs_folder)
     for folder in all_pfs:
         pfs = folder.stem
