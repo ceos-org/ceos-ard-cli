@@ -7,7 +7,9 @@ from .compile import compile
 from .utils.files import read_file
 
 
-def generate_all(output, input_dir, self_contained=True, pdf=True, docx=True, pfs_list=None):
+def generate_all(
+    output, input_dir, self_contained=True, pdf=True, docx=True, pfs_list=None
+):
     pfs_list = list(pfs_list) if pfs_list is not None else []
     # read all folders from the pfs folder
     input_dir = Path(input_dir or ".")
@@ -20,7 +22,14 @@ def generate_all(output, input_dir, self_contained=True, pdf=True, docx=True, pf
                 continue
             print(pfs)
             try:
-                generate(pfs, output, input_dir, self_contained, pdf, docx,)
+                generate(
+                    pfs,
+                    output,
+                    input_dir,
+                    self_contained,
+                    pdf,
+                    docx,
+                )
             except Exception as e:
                 print(f"Error generating {folder}: {e}")
                 errors += 1
@@ -66,7 +75,7 @@ def run_playwright(out, input_dir):
         browser.close()
 
 
-def run_pandoc(out, format, input_dir: Path, self_contained: bool=True):
+def run_pandoc(out, format, input_dir: Path, self_contained: bool = True):
     cmd = [
         "pandoc",
         f"{out}.md",  # input file

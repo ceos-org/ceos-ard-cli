@@ -9,7 +9,7 @@ def check_pfs(pfs, base_path: Path):
 
     if not pfs_folder.exists():
         raise ValueError(f"PFS base directory {pfs_folder} does not exist.")
-    
+
     document = pfs_folder / "document.yaml"
     if not document.exists():
         raise ValueError(f"PFS document {pfs} does not exist at {document}.")

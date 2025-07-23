@@ -7,7 +7,7 @@ from .requirement import slugify
 
 
 def read_template(input_dir):
-    file = Path(input_dir) / "templates" /"template.md"
+    file = Path(input_dir) / "templates" / "template.md"
     if not file.exists():
         raise ValueError(f"Template {file} does not exist.")
 

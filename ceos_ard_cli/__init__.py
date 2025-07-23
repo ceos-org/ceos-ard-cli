@@ -100,7 +100,10 @@ def generate(pfs, output, input_dir, self_contained, pdf, docx):
 
 @click.command()
 @click.option(
-    "--output", "-o", default="", help="Output directory for PFS files, defaults to the current folder"
+    "--output",
+    "-o",
+    default="",
+    help="Output directory for PFS files, defaults to the current folder",
 )
 @click.option(
     "--input-dir",

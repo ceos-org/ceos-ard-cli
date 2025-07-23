@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from .utils.files import FILE_CACHE, get_all_files, get_all_folders
 from .utils.pfs import read_pfs
 from .utils.template import read_template
@@ -42,11 +43,9 @@ def validate(input_dir):
     # Get a list of all files that were read during PFS validation
     used_files = list(FILE_CACHE.keys())
     # Get all files in the glossary, requirements, and sections
-    all_files = get_all_files([
-        input_dir / "glossary",
-        input_dir / "requirements",
-        input_dir / "sections"
-    ])
+    all_files = get_all_files(
+        [input_dir / "glossary", input_dir / "requirements", input_dir / "sections"]
+    )
     # Print all files that are not refernced by any PFS
     for file in all_files:
         filepath = str(file.absolute())

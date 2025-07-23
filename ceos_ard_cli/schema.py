@@ -28,16 +28,21 @@ def fix_path(path):
 _REFS = lambda path, base_path, schema=None, resolve=False: EmptyList() | UniqueSeq(
     IdReference(path, base_path, schema, resolve)
 )
-_RESOLVED_REFS = lambda path, base_path, schema: _REFS(path, base_path, schema, resolve=True)
+_RESOLVED_REFS = lambda path, base_path, schema: _REFS(
+    path, base_path, schema, resolve=True
+)
 _RESOLVED_SECTIONS = lambda path, base_path: _RESOLVED_REFS(path, base_path, SECTION)
 _REFERENCE_IDS = lambda base_path: _REFS(REFERENCE_PATH, base_path)
 
-_MARKDOWN = lambda file, base_path: Markdown() | MdReference(file, base_path)  # The order is important
+_MARKDOWN = lambda file, base_path: Markdown() | MdReference(
+    file, base_path
+)  # The order is important
 
 _REQUIREMENT_PART = lambda file, base_path: NullNone() | Map(
     {
         "description": _MARKDOWN(file, base_path),
-        Optional("notes", default=[]): EmptyList() | Seq(_MARKDOWN(file, base_path) | MdReference(file, base_path)),
+        Optional("notes", default=[]): EmptyList()
+        | Seq(_MARKDOWN(file, base_path) | MdReference(file, base_path)),
     }
 )
 
@@ -58,7 +63,9 @@ GLOSSARY = lambda file, base_path: Map(
         "description": _MARKDOWN(file, base_path),
     }
 )
-_RESOLVED_GLOSSARY = lambda base_path: _RESOLVED_REFS(GLOSSARY_PATH, base_path, GLOSSARY)
+_RESOLVED_GLOSSARY = lambda base_path: _RESOLVED_REFS(
+    GLOSSARY_PATH, base_path, GLOSSARY
+)
 
 SECTION = lambda file, base_path: Map(
     {
@@ -78,7 +85,9 @@ PFS_DOCUMENT = lambda file, base_path: Map(
         "version": Str(),
         "type": Str(),
         "applies_to": _MARKDOWN(file, base_path),
-        Optional("introduction", default=[]): _RESOLVED_SECTIONS(INTRODUCTION_PATH, base_path),
+        Optional("introduction", default=[]): _RESOLVED_SECTIONS(
+            INTRODUCTION_PATH, base_path
+        ),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("annexes", default=[]): _RESOLVED_SECTIONS(ANNEX_PATH, base_path),
@@ -92,7 +101,9 @@ REQUIREMENT = lambda file, base_path: Map(
         Optional("description", default=""): Str(),
         "threshold": _REQUIREMENT_PART(file, base_path),
         "goal": _REQUIREMENT_PART(file, base_path),
-        Optional("dependencies", default=[]): _REFS(REQUIREMENT_PATH, base_path, REQUIREMENT),
+        Optional("dependencies", default=[]): _REFS(
+            REQUIREMENT_PATH, base_path, REQUIREMENT
+        ),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("metadata", default={}): EmptyDict(),  # todo: add metadata schema
@@ -110,7 +121,9 @@ REQUIREMENTS = lambda file, base_path: Seq(
     Map(
         {
             "category": IdReference(REQUIREMENT_CATEGORY_PATH, base_path, SECTION),
-            "requirements": UniqueSeq(IdReference(REQUIREMENT_PATH, base_path, REQUIREMENT)),
+            "requirements": UniqueSeq(
+                IdReference(REQUIREMENT_PATH, base_path, REQUIREMENT)
+            ),
         }
     )
 )
