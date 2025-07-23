@@ -27,13 +27,19 @@ def cli():
     help="Output file without file extension, defaults to the name of the given PFS",
 )
 @click.option(
+    "--input-dir",
+    "-i",
+    default=None,
+    help="Input directory for PFS files, defaults to the current folder",
+)
+@click.option(
     "--editable",
     "-e",
     is_flag=True,
     default=False,
     help="Adds an 'Assessment' section to the requirements (for editable Word documents)",
 )
-def compile(pfs, output, editable):
+def compile(pfs, output, input_dir, editable):
     """
     Compiles the Markdown file for the given PFS.
     """
@@ -142,7 +148,7 @@ def generate_all(output, input_dir, self_contained, pdf, docx, pfs):
     "--input-dir",
     "-i",
     type=str,
-    help="Input directory for PFS files, defaults to the current folder",   
+    help="Input directory for PFS files, defaults to the current folder",
 )
 def validate(input_dir):
     """
