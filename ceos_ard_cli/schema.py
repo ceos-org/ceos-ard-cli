@@ -32,16 +32,16 @@ _RESOLVED_REFS = lambda path, base_path, schema: _REFS(path, base_path, schema, 
 _RESOLVED_SECTIONS = lambda path, base_path: _RESOLVED_REFS(path, base_path, SECTION)
 _REFERENCE_IDS = lambda base_path: _REFS(REFERENCE_PATH, base_path)
 
-_MARKDOWN = lambda file, base_path=None: Markdown() | MdReference(file)  # The order is important
+_MARKDOWN = lambda file, base_path: Markdown() | MdReference(file, base_path)  # The order is important
 
-_REQUIREMENT_PART = lambda file, base_path=None: NullNone() | Map(
+_REQUIREMENT_PART = lambda file, base_path: NullNone() | Map(
     {
-        "description": _MARKDOWN(file),
-        Optional("notes", default=[]): EmptyList() | Seq(_MARKDOWN(file)),
+        "description": _MARKDOWN(file, base_path),
+        Optional("notes", default=[]): EmptyList() | Seq(_MARKDOWN(file, base_path) | MdReference(file, base_path)),
     }
 )
 
-AUTHORS = lambda file, base_path=None: Seq(
+AUTHORS = lambda file, base_path: Seq(
     Map(
         {
             "name": Str(),
@@ -51,11 +51,11 @@ AUTHORS = lambda file, base_path=None: Seq(
     )
 )
 
-GLOSSARY = lambda file, base_path=None: Map(
+GLOSSARY = lambda file, base_path: Map(
     {
         Optional("filepath", default=fix_path(file)): Str(),
         "term": Str(),
-        "description": _MARKDOWN(file),
+        "description": _MARKDOWN(file, base_path),
     }
 )
 _RESOLVED_GLOSSARY = lambda base_path: _RESOLVED_REFS(GLOSSARY_PATH, base_path, GLOSSARY)
@@ -65,7 +65,7 @@ SECTION = lambda file, base_path: Map(
         Optional("filepath", default=fix_path(file)): Str(),
         Optional("id", default=""): Str(),
         "title": Str(),
-        "description": _MARKDOWN(file),
+        "description": _MARKDOWN(file, base_path),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
     }
@@ -77,7 +77,7 @@ PFS_DOCUMENT = lambda file, base_path: Map(
         "title": Str(),
         "version": Str(),
         "type": Str(),
-        "applies_to": _MARKDOWN(file),
+        "applies_to": _MARKDOWN(file, base_path),
         Optional("introduction", default=[]): _RESOLVED_SECTIONS(INTRODUCTION_PATH, base_path),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
@@ -90,8 +90,8 @@ REQUIREMENT = lambda file, base_path: Map(
         Optional("filepath", default=fix_path(file)): Str(),
         "title": Str(),
         Optional("description", default=""): Str(),
-        "threshold": _REQUIREMENT_PART(file),
-        "goal": _REQUIREMENT_PART(file),
+        "threshold": _REQUIREMENT_PART(file, base_path),
+        "goal": _REQUIREMENT_PART(file, base_path),
         Optional("dependencies", default=[]): _REFS(REQUIREMENT_PATH, base_path, REQUIREMENT),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),

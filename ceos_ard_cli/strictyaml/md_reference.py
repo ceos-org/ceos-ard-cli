@@ -4,8 +4,8 @@ from ..utils.files import read_file
 
 
 class MdReference(strictyaml.ScalarValidator):
-    def __init__(self, file):
-        self._base_path = file.parent
+    def __init__(self, file, base_path):
+        self._base_path = (base_path / file).parent
 
     def validate_scalar(self, chunk):
         if not chunk.contents.startswith("include:"):
