@@ -138,13 +138,19 @@ def generate_all(output, input_dir, self_contained, pdf, docx, pfs):
 
 
 @click.command()
-def validate():
+@click.option(
+    "--input-dir",
+    "-i",
+    type=str,
+    help="Input directory for PFS files, defaults to the current folder",   
+)
+def validate(input_dir):
     """
     Validates (most of) the building blocks.
     """
     print(f"CEOS-ARD CLI {__version__} - Validate building blocks\n")
     try:
-        validate_()
+        validate_(input_dir)
     except Exception as e:
         print(e)
         sys.exit(1)

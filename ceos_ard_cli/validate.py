@@ -1,3 +1,4 @@
+from pathlib import Path
 from .utils.files import FILE_CACHE, get_all_files, get_all_folders
 from .utils.pfs import read_pfs
 from .utils.template import read_template
@@ -8,13 +9,13 @@ def log(id, error=None):
     print(f"- {id}: {message}")
 
 
-def validate():
+def validate(input_dir):
     # Validate PFS template
     print("Validating PFS template (basic checks only)")
     error = None
     try:
         # todo: check more, this check is only very high-level jinja-based
-        read_template()
+        read_template(input_dir)
     except Exception as e:
         error = e
     finally:
@@ -23,12 +24,13 @@ def validate():
     # Validate all PFS
     # This also validates all files that are used/referenced in the PFS
     print("Validating PFS")
-    all_pfs = get_all_folders("pfs")
+    input_pfs_folder = Path(input_dir) / "pfs"
+    all_pfs = get_all_folders(input_pfs_folder)
     for folder in all_pfs:
         pfs = folder.stem
         error = None
         try:
-            read_pfs(pfs)
+            read_pfs(pfs, input_dir)
         except Exception as e:
             error = e
         finally:
