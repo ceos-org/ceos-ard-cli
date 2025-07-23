@@ -8,20 +8,23 @@ from ..utils.yaml import read_yaml
 
 
 class IdReference(strictyaml.ScalarValidator):
-    def __init__(self, path_template, schema=None, resolve=True):
+    def __init__(self, path_template, base_path, schema=None, resolve=True):
         self._path_template = path_template
+        self._base_path = base_path
         self._schema = schema
         self._resolve = resolve
 
     def validate_scalar(self, chunk):
-        file = Path(self._path_template.format(id=chunk.contents))
+        file = Path(self._base_path) / Path(
+            self._path_template.format(id=chunk.contents)
+        )
         content = None
         if not file.exists():
             chunk.expecting_but_found(
                 f"expecting an existing file at {file} for id '{chunk.contents}'"
             )
         elif file.suffix == ".yaml":
-            content = read_yaml(file, self._schema)
+            content = read_yaml(file, self._schema, self._base_path)
             if "id" not in content or len(content["id"]) == 0:
                 content["id"] = chunk.contents
         elif file.suffix == ".bib":

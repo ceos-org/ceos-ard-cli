@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from .utils.files import FILE_CACHE, get_all_files, get_all_folders
 from .utils.pfs import read_pfs
 from .utils.template import read_template
@@ -8,13 +10,14 @@ def log(id, error=None):
     print(f"- {id}: {message}")
 
 
-def validate():
+def validate(input_dir):
+    input_dir = Path(input_dir or ".")
     # Validate PFS template
     print("Validating PFS template (basic checks only)")
     error = None
     try:
         # todo: check more, this check is only very high-level jinja-based
-        read_template()
+        read_template(input_dir)
     except Exception as e:
         error = e
     finally:
@@ -23,12 +26,13 @@ def validate():
     # Validate all PFS
     # This also validates all files that are used/referenced in the PFS
     print("Validating PFS")
-    all_pfs = get_all_folders("pfs")
+    input_pfs_folder = input_dir / "pfs"
+    all_pfs = get_all_folders(input_pfs_folder)
     for folder in all_pfs:
         pfs = folder.stem
         error = None
         try:
-            read_pfs(pfs)
+            read_pfs(pfs, input_dir)
         except Exception as e:
             error = e
         finally:
@@ -39,7 +43,9 @@ def validate():
     # Get a list of all files that were read during PFS validation
     used_files = list(FILE_CACHE.keys())
     # Get all files in the glossary, requirements, and sections
-    all_files = get_all_files(["glossary", "requirements", "sections"])
+    all_files = get_all_files(
+        [input_dir / "glossary", input_dir / "requirements", input_dir / "sections"]
+    )
     # Print all files that are not refernced by any PFS
     for file in all_files:
         filepath = str(file.absolute())

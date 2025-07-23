@@ -8,7 +8,7 @@ from ..utils.files import read_file
 YAML_DEPTH = 0
 
 
-def read_yaml(file, schema):
+def read_yaml(file, schema, base_path):
     global YAML_DEPTH
     if YAML_DEPTH > 5:
         return {}
@@ -16,7 +16,7 @@ def read_yaml(file, schema):
     yaml = read_file(file)
     if not schema:
         raise (ValueError(f"Schema is not provided for {file}"))
-    obj = to_py(strictyaml.load(yaml, schema(file)))
+    obj = to_py(strictyaml.load(yaml, schema(file, base_path)))
     YAML_DEPTH -= 1
     return obj
 

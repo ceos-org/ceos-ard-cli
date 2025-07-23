@@ -37,32 +37,34 @@ def _bubble_up(data, root):
     return root
 
 
-def compile(pfs, out, editable=False):
+def compile(pfs, out, input_dir, editable=False):
     folder = Path(out).parent
     # create folder if needed
     folder.mkdir(parents=True, exist_ok=True)
     # copy assets if needed
-    assets = folder / "assets"
-    if not assets.exists():
-        shutil.copytree(Path("assets"), assets)
+    assets_target = folder / "assets"
+    input_dir = Path(input_dir or ".")
+    assets_source = input_dir / "assets"
+    if not assets_target.exists():
+        shutil.copytree(assets_source, assets_target)
     # read the PFS information
-    data = read_pfs(pfs)
+    data = read_pfs(pfs, input_dir)
     # move the glossary and references to the top level
     data = bubble_up(data)
     # write a json file for debugging
     # import json
     # write_file(f"{out}.debug.json", json.dumps(data, indent=2))
     # create the markfown template
-    compile_markdown(data, f"{out}.md", editable)
+    compile_markdown(data, f"{out}.md", editable, input_dir)
     # write bibtex file to disk
-    compile_bibtex(data, f"{out}.bib")
+    compile_bibtex(data, f"{out}.bib", input_dir)
 
 
-def compile_bibtex(data, out):
+def compile_bibtex(data, out, input_dir: Path):
     references = []
     # Read references form disk
     for ref in data["references"]:
-        filepath = REFERENCE_PATH.format(id=ref)
+        filepath = input_dir / REFERENCE_PATH.format(id=ref)
         bibtex = read_file(filepath)
         references.append(bibtex)
     # Merge into a single string
@@ -76,7 +78,7 @@ def create_uid(block, req_id):
     return slugify(block["category"]["id"] + "." + req_id)
 
 
-def compile_markdown(data, out, editable):
+def compile_markdown(data, out, editable, input_dir: Path):
     # create a copy of the data for the template
     context = data.copy()
 
@@ -119,7 +121,7 @@ def compile_markdown(data, out, editable):
                 update_requirement_references(req, id, ref_id)
 
     # read, fill and write the template
-    template = read_template()
+    template = read_template(input_dir)
     markdown = template.render(**context)
     write_file(out, markdown)
 

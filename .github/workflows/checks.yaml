@@ -20,6 +20,8 @@ jobs:
         run: pixi run install-dev
       - name: Execute linter
         run: pixi run -e dev lint
+      - name: Execute formatter
+        run: pixi run -e dev format
 
   tests:
     name: Tests
