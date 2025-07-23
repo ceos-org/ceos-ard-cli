@@ -1,4 +1,4 @@
-import pathlib as path
+from pathlib import Path
 
 from jinja2 import Environment
 
@@ -6,8 +6,8 @@ from .files import read_file
 from .requirement import slugify
 
 
-def read_template(input_dir: path):
-    file = path.Path(input_dir) / "templates" /"template.md"
+def read_template(input_dir):
+    file = Path(input_dir) / "templates" /"template.md"
     if not file.exists():
         raise ValueError(f"Template {file} does not exist.")
 

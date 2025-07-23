@@ -1,10 +1,10 @@
-import pathlib as path
+from pathlib import Path
 
 from ..schema import AUTHORS, PFS_DOCUMENT, REQUIREMENTS
 from .yaml import read_yaml
 
 
-def check_pfs(pfs, base_path: path):
+def check_pfs(pfs, base_path: Path):
     pfs_folder = base_path / "pfs" / pfs
 
     if not pfs_folder.exists():
@@ -25,8 +25,8 @@ def check_pfs(pfs, base_path: path):
     return document, authors, requirements
 
 
-def read_pfs(pfs, input_dir: path):
-    base_path = path.Path(input_dir)
+def read_pfs(pfs, input_dir: Path):
+    base_path = Path(input_dir)
     document, authors, requirements = check_pfs(pfs, base_path)
 
     data = read_yaml(document, PFS_DOCUMENT, base_path)

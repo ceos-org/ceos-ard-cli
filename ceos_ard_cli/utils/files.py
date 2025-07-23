@@ -22,7 +22,7 @@ def write_file(file, content):
 
 def get_all_folders(folder, deep=True):
     folders = []
-    for f in folder.iterdir():
+    for f in Path(folder).iterdir():
         if f.is_dir():
             folders.append(f)
             if deep:
