@@ -1,5 +1,6 @@
 import subprocess
 from pathlib import Path
+from typing import Union
 
 from playwright.sync_api import sync_playwright
 
@@ -8,9 +9,13 @@ from .utils.files import read_file
 
 
 def generate_all(
-    output, input_dir, self_contained=True, pdf=True, docx=True, pfs_list=None
+    output: Union[Path, str],
+    input_dir: Union[Path, str],
+    self_contained: bool = True,
+    pdf: bool = True,
+    docx: bool = True,
+    pfs_list: list = [],
 ):
-    pfs_list = list(pfs_list) if pfs_list is not None else []
     # read all folders from the pfs folder
     input_dir = Path(input_dir or ".")
     input_pfs_folder = input_dir / "pfs"
@@ -37,29 +42,39 @@ def generate_all(
     return errors
 
 
-def generate(pfs, output, input_dir, self_contained=True, pdf=True, docx=True):
+def generate(
+    pfs: Union[list[str], str],
+    output: Union[Path, str],
+    input_dir: Union[Path, str],
+    self_contained: bool = True,
+    pdf: bool = True,
+    docx: bool = True,
+):
+    if isinstance(pfs, str):
+        pfs = [pfs]
+
     input_dir = Path(input_dir or ".")
-    output_pfs_folder = (Path(output) / pfs).absolute()
+    output_prefix = (Path(output) / "-".join(pfs)).absolute()
 
     if docx:
         print("- Generating editable Markdown")
-        compile(pfs, output_pfs_folder, input_dir, True)
+        compile(pfs, output_prefix, input_dir, True)
 
         print("- Generating Word")
-        run_pandoc(output_pfs_folder, "docx", input_dir, self_contained)
+        run_pandoc(output_prefix, "docx", input_dir, self_contained)
 
     print("- Generating read-only Markdown")
-    compile(pfs, output_pfs_folder, input_dir, False)
+    compile(pfs, output_prefix, input_dir, False)
 
     print("- Generating HTML")
-    run_pandoc(output_pfs_folder, "html", input_dir, self_contained)
+    run_pandoc(output_prefix, "html", input_dir, self_contained)
 
     if pdf:
         print("- Generating PDF")
-        run_playwright(output_pfs_folder, input_dir)
+        run_playwright(output_prefix, input_dir)
 
 
-def run_playwright(out, input_dir):
+def run_playwright(out: Path, input_dir: Path):
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
@@ -75,7 +90,7 @@ def run_playwright(out, input_dir):
         browser.close()
 
 
-def run_pandoc(out, format, input_dir: Path, self_contained: bool = True):
+def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = True):
     cmd = [
         "pandoc",
         f"{out}.md",  # input file

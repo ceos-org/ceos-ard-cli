@@ -19,7 +19,7 @@ def cli():
 
 
 @click.command()
-@click.argument("pfs", nargs=1)
+@click.argument("pfs", nargs=-1)
 @click.option(
     "--output",
     "-o",
@@ -39,24 +39,31 @@ def cli():
     default=False,
     help="Adds an 'Assessment' section to the requirements (for editable Word documents)",
 )
-def compile(pfs, output, input_dir, editable):
+@click.option(
+    "--json",
+    is_flag=True,
+    default=False,
+    help="Outputs a JSON file for debugging purposes",
+)
+def compile(pfs, output, input_dir, editable, json):
     """
     Compiles the Markdown file for the given PFS.
     """
-    print(f"CEOS-ARD CLI {__version__} - Compile {pfs} as Markdown\n")
+    pfs = list(pfs)
+    print(f"CEOS-ARD CLI {__version__} - Compile {' + '.join(pfs)} as Markdown\n")
 
     if not output:
-        output = pfs
+        output = "-".join(pfs)
 
     try:
-        compile_(pfs, output, editable)
+        compile_(pfs, output, input_dir, editable, debug=json)
     except Exception as e:
         print(e)
         sys.exit(1)
 
 
 @click.command()
-@click.argument("pfs", nargs=1)
+@click.argument("pfs", nargs=-1)
 @click.option(
     "--output",
     "-o",
@@ -86,10 +93,11 @@ def generate(pfs, output, input_dir, self_contained, pdf, docx):
 
     Requires that pandoc is installed.
     """
-    print(f"CEOS-ARD CLI {__version__} - Generate {pfs}\n")
+    pfs = list(pfs)
+    print(f"CEOS-ARD CLI {__version__} - Generate {' + '.join(pfs)}\n")
 
     if not output:
-        output = pfs
+        output = "-".join(pfs)
 
     try:
         generate_(pfs, output, input_dir, self_contained, pdf, docx)
@@ -136,6 +144,7 @@ def generate_all(output, input_dir, self_contained, pdf, docx, pfs):
     Requires that pandoc is installed.
     """
     print(f"CEOS-ARD CLI {__version__} - Generate all PFS\n")
+    pfs = list(pfs) if pfs is not None else []
     try:
         errors = generate_all_(output, input_dir, self_contained, pdf, docx, pfs)
         print()

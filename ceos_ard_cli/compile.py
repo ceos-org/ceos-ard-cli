@@ -1,5 +1,6 @@
 import shutil
 from pathlib import Path
+from typing import Union
 
 from .schema import REFERENCE_PATH
 from .utils.files import read_file, write_file
@@ -37,7 +38,95 @@ def _bubble_up(data, root):
     return root
 
 
-def compile(pfs, out, input_dir, editable=False):
+def to_id_dict(data):
+    d = {}
+    for item in data:
+        d[item["id"]] = item
+    return d
+
+
+def combine_pfs(multi_pfs):
+    data = {
+        "combined": True,
+        "id": [],
+        "title": [],
+        "version": "Draft / Unversioned",
+        "type": set(),
+        "applies_to": {},
+        "introduction": {},
+        "glossary": {},
+        "references": set(),
+        "annexes": {},
+        "authors": {},
+        "requirements": [],
+    }
+    categories = {}
+    requirements = {}
+
+    for pfs in multi_pfs.values():
+        data["id"].append(pfs["id"])
+        data["title"].append(pfs["title"])
+        data["type"].add(pfs["type"])
+        data["applies_to"][pfs["title"]] = pfs["applies_to"]
+        data["introduction"] = to_id_dict(pfs["introduction"])
+        data["glossary"] = to_id_dict(pfs["glossary"])
+        data["references"].update(pfs["references"])
+        data["annexes"] = to_id_dict(pfs["annexes"])
+
+        for author in pfs["authors"]:
+            key = author["name"] + author.get("country", "")
+            if key not in data["authors"]:
+                data["authors"][key] = author
+            else:
+                existing = data["authors"][key]["members"]
+                for member in author["members"]:
+                    if member not in existing:
+                        existing.append(member)
+
+        for block in pfs["requirements"]:
+            cid = block["category"]["id"]
+            if cid not in categories:
+                categories[cid] = block["category"]
+                requirements[cid] = {}
+
+            for item in block["requirements"]:
+                iid = item["id"]
+                if iid not in requirements[cid]:
+                    item = item.copy()
+                    item["applies_to"] = [pfs["id"]]
+                    requirements[cid][iid] = item
+                else:
+                    requirements[cid][iid]["applies_to"].append(pfs["id"])
+
+    data["id"] = "+".join(data["id"])
+    data["title"] = "Combined: " + " / ".join(data["title"])
+    data["type"] = "Fusion" if len(data["type"]) > 1 else data["type"].pop()
+    data["introduction"] = list(data["introduction"].values())
+    data["glossary"] = list(data["glossary"].values())
+    data["references"] = list(data["references"])
+    data["annexes"] = list(data["annexes"].values())
+    data["authors"] = list(data["authors"].values())
+    for value in categories.values():
+        data["requirements"].append(
+            {
+                "category": value,
+                "requirements": list(requirements[value["id"]].values()),
+            }
+        )
+
+    return data
+
+
+def compile(
+    pfs: Union[list[str], str],
+    out: Union[Path, str],
+    input_dir: Union[Path, str],
+    editable: bool = False,
+    debug: bool = False,
+):
+    if isinstance(pfs, str):
+        pfs = [pfs]
+
     folder = Path(out).parent
     # create folder if needed
     folder.mkdir(parents=True, exist_ok=True)
@@ -45,15 +134,26 @@ def compile(pfs, out, input_dir, editable=False):
     assets_target = folder / "assets"
     input_dir = Path(input_dir or ".")
     assets_source = input_dir / "assets"
-    if not assets_target.exists():
+    if not assets_target.exists() and assets_source != assets_target:
         shutil.copytree(assets_source, assets_target)
-    # read the PFS information
-    data = read_pfs(pfs, input_dir)
-    # move the glossary and references to the top level
-    data = bubble_up(data)
+
+    multi_pfs = {}
+    for p in pfs:
+        # read the PFS information and
+        # move the glossary and references to the top level
+        multi_pfs[p] = bubble_up(read_pfs(p, input_dir))
+
+    if len(pfs) > 1:
+        data = combine_pfs(multi_pfs)
+    else:
+        data = multi_pfs[pfs[0]]
+
     # write a json file for debugging
-    # import json
-    # write_file(f"{out}.debug.json", json.dumps(data, indent=2))
+    if debug:
+        import json
+
+        write_file(f"{out}.debug.json", json.dumps(data, indent=2))
+
     # create the markfown template
     compile_markdown(data, f"{out}.md", editable, input_dir)
     # write bibtex file to disk
