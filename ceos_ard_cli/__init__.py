@@ -56,7 +56,7 @@ def compile(pfs, output, input_dir, editable, json):
         output = "-".join(pfs)
 
     try:
-        compile_(pfs, output, input_dir, editable, debug=json)
+        compile_(pfs, output, input_dir, editable=editable, debug=json)
     except Exception as e:
         print(e)
         sys.exit(1)

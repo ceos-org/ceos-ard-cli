@@ -45,7 +45,7 @@ def to_id_dict(data):
     return d
 
 
-def combine_pfs(multi_pfs, metadata={}):
+def combine_pfs(multi_pfs):
     data = {
         "combined": True,
         "id": [],
@@ -89,10 +89,11 @@ def combine_pfs(multi_pfs, metadata={}):
                 categories[cid] = block["category"]
                 requirements[cid] = {}
 
-            for item in block["requirements"]:
+            for i, item in enumerate(block["requirements"]):
                 iid = item["id"]
                 if iid not in requirements[cid]:
                     item = item.copy()
+                    item["priority"] = i
                     item["applies_to"] = [pfs["id"]]
                     requirements[cid][iid] = item
                 else:
@@ -107,10 +108,14 @@ def combine_pfs(multi_pfs, metadata={}):
     data["annexes"] = list(data["annexes"].values())
     data["authors"] = list(data["authors"].values())
     for value in categories.values():
+        sorted_requirements = sorted(
+            requirements[value["id"]].values(),
+            key=lambda x: x["priority"]
+        )
         data["requirements"].append(
             {
                 "category": value,
-                "requirements": list(requirements[value["id"]].values()),
+                "requirements": sorted_requirements,
             }
         )
 

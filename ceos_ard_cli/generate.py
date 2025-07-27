@@ -59,7 +59,7 @@ def generate(
 
     if docx:
         print("- Generating editable Markdown")
-        compile(pfs, output_prefix, input_dir, editable=True, metadata=metadata)
+        compile(pfs, output_prefix, input_dir, editable=False, metadata=metadata)
 
         print("- Generating Word")
         run_pandoc(output_prefix, "docx", input_dir, self_contained)
