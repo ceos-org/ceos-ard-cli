@@ -49,6 +49,7 @@ def generate(
     self_contained: bool = True,
     pdf: bool = True,
     docx: bool = True,
+    metadata: dict = {},
 ):
     if isinstance(pfs, str):
         pfs = [pfs]
@@ -58,13 +59,13 @@ def generate(
 
     if docx:
         print("- Generating editable Markdown")
-        compile(pfs, output_prefix, input_dir, True)
+        compile(pfs, output_prefix, input_dir, editable=True, metadata=metadata)
 
         print("- Generating Word")
         run_pandoc(output_prefix, "docx", input_dir, self_contained)
 
     print("- Generating read-only Markdown")
-    compile(pfs, output_prefix, input_dir, False)
+    compile(pfs, output_prefix, input_dir, editable=True, metadata=metadata)
 
     print("- Generating HTML")
     run_pandoc(output_prefix, "html", input_dir, self_contained)

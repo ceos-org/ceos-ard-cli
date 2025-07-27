@@ -87,7 +87,29 @@ def compile(pfs, output, input_dir, editable, json):
 @click.option(
     "--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation"
 )
-def generate(pfs, output, input_dir, self_contained, pdf, docx):
+@click.option(
+    "--id",
+    default=None,
+    help="Overrides the ID of the document",
+)
+@click.option(
+    "--title",
+    default=None,
+    help="Overrides the title of the document",
+)
+@click.option(
+    "--version",
+    default=None,
+    help="Overrides the version number of the document",
+)
+@click.option(
+    "--pfs-type",
+    default=None,
+    help="Overrides the PFS type of the document",
+)
+def generate(
+    pfs, output, input_dir, self_contained, pdf, docx, id, title, version, pfs_type
+):
     """
     Generates the Word and HTML files for the given PFS.
 
@@ -99,8 +121,15 @@ def generate(pfs, output, input_dir, self_contained, pdf, docx):
     if not output:
         output = "-".join(pfs)
 
+    metadata = {
+        "id": id,
+        "title": title,
+        "version": version,
+        "type": pfs_type,
+    }
+
     try:
-        generate_(pfs, output, input_dir, self_contained, pdf, docx)
+        generate_(pfs, output, input_dir, self_contained, pdf, docx, metadata)
     except Exception as e:
         print(e)
         sys.exit(1)

@@ -45,12 +45,12 @@ def to_id_dict(data):
     return d
 
 
-def combine_pfs(multi_pfs):
+def combine_pfs(multi_pfs, metadata={}):
     data = {
         "combined": True,
         "id": [],
         "title": [],
-        "version": "Draft / Unversioned",
+        "version": "",
         "type": set(),
         "applies_to": {},
         "introduction": {},
@@ -122,6 +122,7 @@ def compile(
     out: Union[Path, str],
     input_dir: Union[Path, str],
     editable: bool = False,
+    metadata: dict = {},
     debug: bool = False,
 ):
     if isinstance(pfs, str):
@@ -147,6 +148,12 @@ def compile(
         data = combine_pfs(multi_pfs)
     else:
         data = multi_pfs[pfs[0]]
+
+    # Override metadata if provided
+    data["id"] = metadata.get("id") or data["id"]
+    data["title"] = metadata.get("title") or data["title"]
+    data["version"] = metadata.get("version") or data["version"]
+    data["type"] = metadata.get("type") or data["type"]
 
     # write a json file for debugging
     if debug:
@@ -191,23 +198,26 @@ def compile_markdown(data, out, editable, input_dir: Path):
 
     # make a dict of all requirements for efficient dependency lookup
     all_requirements = {}
+    # make a dict of the requirements in this category for efficient dependency lookup
+    local_requirements = {}
     # generate uid for each requirement and fill dependency lookups
     for block in context["requirements"]:
-        # make a dict of the requirements in this category for efficient dependency lookup
-        local_requirements = {}
+        cid = block["category"]["id"]
+        local_requirements[cid] = {}
         for req in block["requirements"]:
             # make uid unique if it can be used in multiple categories
             req["uid"] = create_uid(block, req["id"])
-            local_requirements[req["id"]] = req["uid"]
+            local_requirements[cid][req["id"]] = req["uid"]
             all_requirements[req["id"]] = req["uid"]
 
     # resolve dependencies
     for block in context["requirements"]:
+        cid = block["category"]["id"]
         for req in block["requirements"]:
             for i, id in enumerate(req["dependencies"]):
                 # 1. Check to the requirement in the same requirement category.
-                if id in local_requirements:
-                    ref_id = local_requirements[id]
+                if id in local_requirements[cid]:
+                    ref_id = local_requirements[cid][id]
                 # 2. Refers to the requirement in any other category.
                 elif id in all_requirements:
                     ref_id = all_requirements[id]
