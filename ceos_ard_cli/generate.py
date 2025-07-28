@@ -17,8 +17,9 @@ def generate_all(
     pfs_list: list = [],
 ):
     # read all folders from the pfs folder
-    input_dir = Path(input_dir or ".")
+    input_dir = Path(input_dir)
     input_pfs_folder = input_dir / "pfs"
+    output = Path(output)
     errors = 0
     for folder in input_pfs_folder.iterdir():
         if folder.is_dir():
@@ -29,7 +30,7 @@ def generate_all(
             try:
                 generate(
                     pfs,
-                    output,
+                    output / pfs,
                     input_dir,
                     self_contained,
                     pdf,
@@ -54,25 +55,25 @@ def generate(
     if isinstance(pfs, str):
         pfs = [pfs]
 
-    input_dir = Path(input_dir or ".")
-    output_prefix = (Path(output) / "-".join(pfs)).absolute()
+    input_dir = Path(input_dir)
+    output = Path(output).absolute()
 
     if docx:
         print("- Generating editable Markdown")
-        compile(pfs, output_prefix, input_dir, editable=False, metadata=metadata)
+        compile(pfs, output, input_dir, editable=False, metadata=metadata)
 
         print("- Generating Word")
-        run_pandoc(output_prefix, "docx", input_dir, self_contained)
+        run_pandoc(output, "docx", input_dir, self_contained)
 
     print("- Generating read-only Markdown")
-    compile(pfs, output_prefix, input_dir, editable=True, metadata=metadata)
+    compile(pfs, output, input_dir, editable=True, metadata=metadata)
 
     print("- Generating HTML")
-    run_pandoc(output_prefix, "html", input_dir, self_contained)
+    run_pandoc(output, "html", input_dir, self_contained)
 
     if pdf:
         print("- Generating PDF")
-        run_playwright(output_prefix, input_dir)
+        run_playwright(output, input_dir)
 
 
 def run_playwright(out: Path, input_dir: Path):

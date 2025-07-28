@@ -109,8 +109,7 @@ def combine_pfs(multi_pfs):
     data["authors"] = list(data["authors"].values())
     for value in categories.values():
         sorted_requirements = sorted(
-            requirements[value["id"]].values(),
-            key=lambda x: x["priority"]
+            requirements[value["id"]].values(), key=lambda x: x["priority"]
         )
         data["requirements"].append(
             {
@@ -138,7 +137,7 @@ def compile(
     folder.mkdir(parents=True, exist_ok=True)
     # copy assets if needed
     assets_target = folder / "assets"
-    input_dir = Path(input_dir or ".")
+    input_dir = Path(input_dir)
     assets_source = input_dir / "assets"
     if not assets_target.exists() and assets_source != assets_target:
         shutil.copytree(assets_source, assets_target)

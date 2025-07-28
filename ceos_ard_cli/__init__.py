@@ -29,7 +29,7 @@ def cli():
 @click.option(
     "--input-dir",
     "-i",
-    default=None,
+    default=".",
     help="Input directory for PFS files, defaults to the current folder",
 )
 @click.option(
@@ -73,7 +73,7 @@ def compile(pfs, output, input_dir, editable, json):
 @click.option(
     "--input-dir",
     "-i",
-    default=None,
+    default=".",
     help="Input directory for PFS files, defaults to the current folder",
 )
 @click.option(
@@ -119,7 +119,7 @@ def generate(
     print(f"CEOS-ARD CLI {__version__} - Generate {' + '.join(pfs)}\n")
 
     if not output:
-        output = "-".join(pfs)
+        output = id or "-".join(pfs)
 
     metadata = {
         "id": id,
@@ -139,14 +139,13 @@ def generate(
 @click.option(
     "--output",
     "-o",
-    default="",
+    default=".",
     help="Output directory for PFS files, defaults to the current folder",
 )
 @click.option(
     "--input-dir",
     "-i",
-    type=str,
-    default=None,
+    default=".",
     help="Input directory for PFS files, defaults to the current folder",
 )
 @click.option(
@@ -188,7 +187,7 @@ def generate_all(output, input_dir, self_contained, pdf, docx, pfs):
 @click.option(
     "--input-dir",
     "-i",
-    type=str,
+    default=".",
     help="Input directory for PFS files, defaults to the current folder",
 )
 def validate(input_dir):
