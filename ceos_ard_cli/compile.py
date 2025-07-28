@@ -73,13 +73,13 @@ def combine_pfs(multi_pfs):
         data["references"].update(pfs["references"])
         data["annexes"] = to_id_dict(pfs["annexes"])
 
-        for author in pfs["authors"]:
-            key = author["name"] + author.get("country", "")
+        for organization in pfs["authors"]:
+            key = organization["name"] + organization.get("country", "")
             if key not in data["authors"]:
-                data["authors"][key] = author
+                data["authors"][key] = organization
             else:
                 existing = data["authors"][key]["members"]
-                for member in author["members"]:
+                for member in organization["members"]:
                     if member not in existing:
                         existing.append(member)
 
