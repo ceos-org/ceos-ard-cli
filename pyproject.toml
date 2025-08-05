@@ -29,6 +29,7 @@ dev = [
     "ruff",        # Code formatting tool
     "pytest",      # Testing framework
     "pre-commit",  # Run tests on commit
+    "build",       # Python build tool
 ]
 [project.scripts]
 ceos-ard = "ceos_ard_cli:cli"

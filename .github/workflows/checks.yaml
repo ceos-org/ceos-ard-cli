@@ -17,7 +17,7 @@ jobs:
           pixi-version: v0.49.0
           cache: true
       - name: Install Python dev dependencies
-        run: pixi run install-dev
+        run: pixi run -e dev install-dev
       - name: Execute linter
         run: pixi run -e dev lint
       - name: Execute formatter
@@ -41,7 +41,8 @@ jobs:
         with:
           pixi-version: v0.49.0
           cache: true
+          environments: dev
       - name: Install Python dev dependencies
-        run: pixi run install-dev
+        run: pixi run -e dev install-dev
       - name: Execute tests
         run: pixi run -e dev test
