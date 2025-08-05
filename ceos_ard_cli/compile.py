@@ -1,5 +1,6 @@
 import shutil
 from pathlib import Path
+from typing import Union
 
 from .schema import REFERENCE_PATH
 from .utils.files import read_file, write_file
@@ -37,23 +38,133 @@ def _bubble_up(data, root):
     return root
 
 
-def compile(pfs, out, input_dir, editable=False):
+def to_id_dict(data):
+    d = {}
+    for item in data:
+        d[item["id"]] = item
+    return d
+
+
+def combine_pfs(multi_pfs):
+    data = {
+        "combined": True,
+        "id": [],
+        "title": [],
+        "version": "",
+        "type": set(),
+        "applies_to": {},
+        "introduction": {},
+        "glossary": {},
+        "references": set(),
+        "annexes": {},
+        "authors": {},
+        "requirements": [],
+    }
+    categories = {}
+    requirements = {}
+
+    for pfs in multi_pfs.values():
+        data["id"].append(pfs["id"])
+        data["title"].append(pfs["title"])
+        data["type"].add(pfs["type"])
+        data["applies_to"][pfs["title"]] = pfs["applies_to"]
+        data["introduction"] = to_id_dict(pfs["introduction"])
+        data["glossary"] = to_id_dict(pfs["glossary"])
+        data["references"].update(pfs["references"])
+        data["annexes"] = to_id_dict(pfs["annexes"])
+
+        for organization in pfs["authors"]:
+            key = organization["name"] + organization.get("country", "")
+            if key not in data["authors"]:
+                data["authors"][key] = organization
+            else:
+                existing = data["authors"][key]["members"]
+                for member in organization["members"]:
+                    if member not in existing:
+                        existing.append(member)
+
+        for block in pfs["requirements"]:
+            cid = block["category"]["id"]
+            if cid not in categories:
+                categories[cid] = block["category"]
+                requirements[cid] = {}
+
+            for i, item in enumerate(block["requirements"]):
+                iid = item["id"]
+                if iid not in requirements[cid]:
+                    item = item.copy()
+                    item["priority"] = i
+                    item["applies_to"] = [pfs["id"]]
+                    requirements[cid][iid] = item
+                else:
+                    requirements[cid][iid]["applies_to"].append(pfs["id"])
+
+    data["id"] = "+".join(data["id"])
+    data["title"] = "Combined: " + " / ".join(data["title"])
+    data["type"] = "Fusion" if len(data["type"]) > 1 else data["type"].pop()
+    data["introduction"] = list(data["introduction"].values())
+    data["glossary"] = list(data["glossary"].values())
+    data["references"] = list(data["references"])
+    data["annexes"] = list(data["annexes"].values())
+    data["authors"] = list(data["authors"].values())
+    for value in categories.values():
+        sorted_requirements = sorted(
+            requirements[value["id"]].values(), key=lambda x: x["priority"]
+        )
+        data["requirements"].append(
+            {
+                "category": value,
+                "requirements": sorted_requirements,
+            }
+        )
+
+    return data
+
+
+def compile(
+    pfs: Union[list[str], str],
+    out: Union[Path, str],
+    input_dir: Union[Path, str],
+    editable: bool = False,
+    metadata: dict = {},
+    debug: bool = False,
+):
+    if isinstance(pfs, str):
+        pfs = [pfs]
+
     folder = Path(out).parent
     # create folder if needed
     folder.mkdir(parents=True, exist_ok=True)
     # copy assets if needed
     assets_target = folder / "assets"
-    input_dir = Path(input_dir or ".").resolve()
+    input_dir = Path(input_dir).resolve()
     assets_source = input_dir / "assets"
-    if not assets_target.exists():
+    if not assets_target.exists() and assets_source != assets_target:
         shutil.copytree(assets_source, assets_target)
-    # read the PFS information
-    data = read_pfs(pfs, input_dir)
-    # move the glossary and references to the top level
-    data = bubble_up(data)
+
+    multi_pfs = {}
+    for p in pfs:
+        # read the PFS information and
+        # move the glossary and references to the top level
+        multi_pfs[p] = bubble_up(read_pfs(p, input_dir))
+
+    if len(pfs) > 1:
+        data = combine_pfs(multi_pfs)
+    else:
+        data = multi_pfs[pfs[0]]
+
+    # Override metadata if provided
+    data["id"] = metadata.get("id") or data["id"]
+    data["title"] = metadata.get("title") or data["title"]
+    data["version"] = metadata.get("version") or data["version"]
+    data["type"] = metadata.get("type") or data["type"]
+
     # write a json file for debugging
-    # import json
-    # write_file(f"{out}.debug.json", json.dumps(data, indent=2))
+    if debug:
+        import json
+
+        write_file(f"{out}.debug.json", json.dumps(data, indent=2))
+
     # create the markfown template
     compile_markdown(data, f"{out}.md", editable, input_dir)
     # write bibtex file to disk
@@ -61,7 +172,7 @@ def compile(pfs, out, input_dir, editable=False):
 
 
 def compile_bibtex(data, out, input_dir: Path):
-    input_dir = Path(input_dir or ".").resolve()
+    input_dir = Path(input_dir).resolve()
     references = []
     # Read references form disk
     for ref in data["references"]:
@@ -80,7 +191,7 @@ def create_uid(block, req_id):
 
 
 def compile_markdown(data, out, editable, input_dir: Path):
-    input_dir = Path(input_dir or ".").resolve()
+    input_dir = Path(input_dir).resolve()
     # create a copy of the data for the template
     context = data.copy()
 
@@ -93,23 +204,26 @@ def compile_markdown(data, out, editable, input_dir: Path):
 
     # make a dict of all requirements for efficient dependency lookup
     all_requirements = {}
+    # make a dict of the requirements in this category for efficient dependency lookup
+    local_requirements = {}
     # generate uid for each requirement and fill dependency lookups
     for block in context["requirements"]:
-        # make a dict of the requirements in this category for efficient dependency lookup
-        local_requirements = {}
+        cid = block["category"]["id"]
+        local_requirements[cid] = {}
         for req in block["requirements"]:
             # make uid unique if it can be used in multiple categories
             req["uid"] = create_uid(block, req["id"])
-            local_requirements[req["id"]] = req["uid"]
+            local_requirements[cid][req["id"]] = req["uid"]
             all_requirements[req["id"]] = req["uid"]
 
     # resolve dependencies
     for block in context["requirements"]:
+        cid = block["category"]["id"]
         for req in block["requirements"]:
             for i, id in enumerate(req["dependencies"]):
                 # 1. Check to the requirement in the same requirement category.
-                if id in local_requirements:
-                    ref_id = local_requirements[id]
+                if id in local_requirements[cid]:
+                    ref_id = local_requirements[cid][id]
                 # 2. Refers to the requirement in any other category.
                 elif id in all_requirements:
                     ref_id = all_requirements[id]

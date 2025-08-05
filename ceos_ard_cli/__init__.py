@@ -19,7 +19,7 @@ def cli():
 
 
 @click.command()
-@click.argument("pfs", nargs=1)
+@click.argument("pfs", nargs=-1)
 @click.option(
     "--output",
     "-o",
@@ -29,7 +29,7 @@ def cli():
 @click.option(
     "--input-dir",
     "-i",
-    default=None,
+    default=".",
     help="Input directory for PFS files, defaults to the current folder",
 )
 @click.option(
@@ -39,24 +39,31 @@ def cli():
     default=False,
     help="Adds an 'Assessment' section to the requirements (for editable Word documents)",
 )
-def compile(pfs, output, input_dir, editable):
+@click.option(
+    "--json",
+    is_flag=True,
+    default=False,
+    help="Outputs a JSON file for debugging purposes",
+)
+def compile(pfs, output, input_dir, editable, json):
     """
     Compiles the Markdown file for the given PFS.
     """
-    print(f"CEOS-ARD CLI {__version__} - Compile {pfs} as Markdown\n")
+    pfs = list(pfs)
+    print(f"CEOS-ARD CLI {__version__} - Compile {' + '.join(pfs)} as Markdown\n")
 
     if not output:
-        output = pfs
+        output = "-".join(pfs)
 
     try:
-        compile_(pfs, output, input_dir, editable)
+        compile_(pfs, output, input_dir, editable=editable, debug=json)
     except Exception as e:
         print(e)
         sys.exit(1)
 
 
 @click.command()
-@click.argument("pfs", nargs=1)
+@click.argument("pfs", nargs=-1)
 @click.option(
     "--output",
     "-o",
@@ -66,7 +73,7 @@ def compile(pfs, output, input_dir, editable):
 @click.option(
     "--input-dir",
     "-i",
-    default=None,
+    default=".",
     help="Input directory for PFS files, defaults to the current folder",
 )
 @click.option(
@@ -80,19 +87,49 @@ def compile(pfs, output, input_dir, editable):
 @click.option(
     "--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation"
 )
-def generate(pfs, output, input_dir, self_contained, pdf, docx):
+@click.option(
+    "--id",
+    default=None,
+    help="Overrides the ID of the document",
+)
+@click.option(
+    "--title",
+    default=None,
+    help="Overrides the title of the document",
+)
+@click.option(
+    "--version",
+    default=None,
+    help="Overrides the version number of the document",
+)
+@click.option(
+    "--pfs-type",
+    default=None,
+    help="Overrides the PFS type of the document",
+)
+def generate(
+    pfs, output, input_dir, self_contained, pdf, docx, id, title, version, pfs_type
+):
     """
     Generates the Word and HTML files for the given PFS.
 
     Requires that pandoc is installed.
     """
-    print(f"CEOS-ARD CLI {__version__} - Generate {pfs}\n")
+    pfs = list(pfs)
+    print(f"CEOS-ARD CLI {__version__} - Generate {' + '.join(pfs)}\n")
 
     if not output:
-        output = pfs
+        output = id or "-".join(pfs)
+
+    metadata = {
+        "id": id,
+        "title": title,
+        "version": version,
+        "type": pfs_type,
+    }
 
     try:
-        generate_(pfs, output, input_dir, self_contained, pdf, docx)
+        generate_(pfs, output, input_dir, self_contained, pdf, docx, metadata)
     except Exception as e:
         print(e)
         sys.exit(1)
@@ -102,14 +139,13 @@ def generate(pfs, output, input_dir, self_contained, pdf, docx):
 @click.option(
     "--output",
     "-o",
-    default="",
+    default=".",
     help="Output directory for PFS files, defaults to the current folder",
 )
 @click.option(
     "--input-dir",
     "-i",
-    type=str,
-    default=None,
+    default=".",
     help="Input directory for PFS files, defaults to the current folder",
 )
 @click.option(
@@ -136,6 +172,7 @@ def generate_all(output, input_dir, self_contained, pdf, docx, pfs):
     Requires that pandoc is installed.
     """
     print(f"CEOS-ARD CLI {__version__} - Generate all PFS\n")
+    pfs = list(pfs) if pfs is not None else []
     try:
         errors = generate_all_(output, input_dir, self_contained, pdf, docx, pfs)
         print()
@@ -150,7 +187,7 @@ def generate_all(output, input_dir, self_contained, pdf, docx, pfs):
 @click.option(
     "--input-dir",
     "-i",
-    type=str,
+    default=".",
     help="Input directory for PFS files, defaults to the current folder",
 )
 def validate(input_dir):

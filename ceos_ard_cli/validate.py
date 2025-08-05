@@ -11,7 +11,7 @@ def log(id, error=None):
 
 
 def validate(input_dir):
-    input_dir = Path(input_dir or ".").resolve()
+    input_dir = Path(input_dir).resolve()
     # Validate PFS template
     print("Validating PFS template (basic checks only)")
     error = None

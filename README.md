@@ -56,6 +56,9 @@ To create the Word, HTML, and PDF versions of a single PFS, run:
 
 The last part is the PFS to create, e.g. `SR` or `SAR-NRB`.
 
+To create a combined PFS, e.g. SAR, the following command can be used:
+`ceos-ard generate SAR-NRB SAR-POL SAR-ORB SAR-GSLC -o ../ceos-ard-spec/build/ -i ../ceos-ard-spec --docx --title="Combined Synthetic Aperture Radar" --version="1.1" --pfs-type="SAR" --id="SAR"`
+
 Check `ceos-ard generate --help` (or `ceos-ard generate --help`) for more details.
 
 ### `ceos-ard generate-all`: Create Word/HTML/PDF documents for all PFSes

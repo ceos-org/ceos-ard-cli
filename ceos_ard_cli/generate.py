@@ -1,5 +1,6 @@
 import subprocess
 from pathlib import Path
+from typing import Union
 
 from playwright.sync_api import sync_playwright
 
@@ -8,12 +9,17 @@ from .utils.files import read_file
 
 
 def generate_all(
-    output, input_dir, self_contained=True, pdf=True, docx=True, pfs_list=None
+    output: Union[Path, str],
+    input_dir: Union[Path, str],
+    self_contained: bool = True,
+    pdf: bool = True,
+    docx: bool = True,
+    pfs_list: list = [],
 ):
-    pfs_list = list(pfs_list) if pfs_list is not None else []
     # read all folders from the pfs folder
-    input_dir = Path(input_dir or ".").resolve()
+    input_dir = Path(input_dir).resolve()
     input_pfs_folder = input_dir / "pfs"
+    output = Path(output)
     errors = 0
     for folder in input_pfs_folder.iterdir():
         if folder.is_dir():
@@ -24,7 +30,7 @@ def generate_all(
             try:
                 generate(
                     pfs,
-                    output,
+                    output / pfs,
                     input_dir,
                     self_contained,
                     pdf,
@@ -37,29 +43,40 @@ def generate_all(
     return errors
 
 
-def generate(pfs, output, input_dir, self_contained=True, pdf=True, docx=True):
-    input_dir = Path(input_dir or ".").resolve()
-    output_pfs_folder = (Path(output) / pfs).resolve()
+def generate(
+    pfs: Union[list[str], str],
+    output: Union[Path, str],
+    input_dir: Union[Path, str],
+    self_contained: bool = True,
+    pdf: bool = True,
+    docx: bool = True,
+    metadata: dict = {},
+):
+    if isinstance(pfs, str):
+        pfs = [pfs]
+
+    input_dir = Path(input_dir).resolve()
+    output = Path(output).resolve()
 
     if docx:
         print("- Generating editable Markdown")
-        compile(pfs, output_pfs_folder, input_dir, True)
+        compile(pfs, output, input_dir, editable=True, metadata=metadata)
 
         print("- Generating Word")
-        run_pandoc(output_pfs_folder, "docx", input_dir, self_contained)
+        run_pandoc(output, "docx", input_dir, self_contained)
 
     print("- Generating read-only Markdown")
-    compile(pfs, output_pfs_folder, input_dir, False)
+    compile(pfs, output, input_dir, editable=False, metadata=metadata)
 
     print("- Generating HTML")
-    run_pandoc(output_pfs_folder, "html", input_dir, self_contained)
+    run_pandoc(output, "html", input_dir, self_contained)
 
     if pdf:
         print("- Generating PDF")
-        run_playwright(output_pfs_folder, input_dir)
+        run_playwright(output, input_dir)
 
 
-def run_playwright(out, input_dir):
+def run_playwright(out: Path, input_dir: Path):
     with sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
@@ -75,7 +92,7 @@ def run_playwright(out, input_dir):
         browser.close()
 
 
-def run_pandoc(out, format, input_dir: Path, self_contained: bool = True):
+def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = True):
     cmd = [
         "pandoc",
         f"{out}.md",  # input file
