@@ -43,7 +43,7 @@ def compile(pfs, out, input_dir, editable=False):
     folder.mkdir(parents=True, exist_ok=True)
     # copy assets if needed
     assets_target = folder / "assets"
-    input_dir = Path(input_dir or ".")
+    input_dir = Path(input_dir or ".").resolve()
     assets_source = input_dir / "assets"
     if not assets_target.exists():
         shutil.copytree(assets_source, assets_target)
@@ -61,6 +61,7 @@ def compile(pfs, out, input_dir, editable=False):
 
 
 def compile_bibtex(data, out, input_dir: Path):
+    input_dir = Path(input_dir or ".").resolve()
     references = []
     # Read references form disk
     for ref in data["references"]:
@@ -79,6 +80,7 @@ def create_uid(block, req_id):
 
 
 def compile_markdown(data, out, editable, input_dir: Path):
+    input_dir = Path(input_dir or ".").resolve()
     # create a copy of the data for the template
     context = data.copy()
 

@@ -49,7 +49,7 @@ def compile(pfs, output, input_dir, editable):
         output = pfs
 
     try:
-        compile_(pfs, output, editable)
+        compile_(pfs, output, input_dir, editable)
     except Exception as e:
         print(e)
         sys.exit(1)

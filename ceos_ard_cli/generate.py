@@ -12,7 +12,7 @@ def generate_all(
 ):
     pfs_list = list(pfs_list) if pfs_list is not None else []
     # read all folders from the pfs folder
-    input_dir = Path(input_dir or ".")
+    input_dir = Path(input_dir or ".").resolve()
     input_pfs_folder = input_dir / "pfs"
     errors = 0
     for folder in input_pfs_folder.iterdir():
@@ -38,8 +38,8 @@ def generate_all(
 
 
 def generate(pfs, output, input_dir, self_contained=True, pdf=True, docx=True):
-    input_dir = Path(input_dir or ".")
-    output_pfs_folder = (Path(output) / pfs).absolute()
+    input_dir = Path(input_dir or ".").resolve()
+    output_pfs_folder = (Path(output) / pfs).resolve()
 
     if docx:
         print("- Generating editable Markdown")
