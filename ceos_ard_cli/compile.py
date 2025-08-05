@@ -137,7 +137,7 @@ def compile(
     folder.mkdir(parents=True, exist_ok=True)
     # copy assets if needed
     assets_target = folder / "assets"
-    input_dir = Path(input_dir)
+    input_dir = Path(input_dir).resolve()
     assets_source = input_dir / "assets"
     if not assets_target.exists() and assets_source != assets_target:
         shutil.copytree(assets_source, assets_target)
@@ -172,6 +172,7 @@ def compile(
 
 
 def compile_bibtex(data, out, input_dir: Path):
+    input_dir = Path(input_dir).resolve()
     references = []
     # Read references form disk
     for ref in data["references"]:
@@ -190,6 +191,7 @@ def create_uid(block, req_id):
 
 
 def compile_markdown(data, out, editable, input_dir: Path):
+    input_dir = Path(input_dir).resolve()
     # create a copy of the data for the template
     context = data.copy()
 
