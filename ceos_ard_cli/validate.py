@@ -50,5 +50,5 @@ def validate(input_dir):
     for file in all_files:
         filepath = str(file.absolute())
         if filepath not in used_files:
-            rel_path = file.relative_to(".")
+            rel_path = file.relative_to(input_dir)
             print(f"- {rel_path}")
