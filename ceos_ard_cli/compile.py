@@ -1,12 +1,113 @@
 import shutil
 from pathlib import Path
 from typing import Union
+from collections import defaultdict
 
 from .schema import REFERENCE_PATH
 from .utils.files import read_file, write_file
 from .utils.pfs import read_pfs
 from .utils.requirement import slugify
 from .utils.template import read_template
+
+
+def topological_sort_requirements(
+    requirements_by_pfs: list[list[str]],
+    equivalence_groups: dict[str, str] = None
+) -> list[str]:
+    """
+    Topologically sort requirements while preserving relative order from each PFS document.
+
+    Args:
+        requirements_by_pfs: List of requirement ID lists, one per PFS document.
+                            Each inner list represents the order of requirements in that PFS.
+        equivalence_groups: Optional mapping from requirement ID to a group key.
+                           Requirements with the same group key are considered equivalent
+                           for ordering purposes and will be placed together.
+                           If None, each requirement is its own group.
+
+    Returns:
+        A merged list of all unique requirement IDs, sorted to respect the relative
+        ordering from all input documents. Requirements in the same equivalence group
+        are placed consecutively.
+
+    Example:
+        Input: [['A', 'B', 'C', 'D', 'E'], ['A', 'C', 'E', 'F', 'X'], ['A', 'A2', 'B', 'E', 'F']]
+        With equivalence_groups={'A': 'grp1', 'A2': 'grp1'}
+        Output: ['A', 'A2', 'B', 'C', 'D', 'E', 'F', 'X']  (A and A2 stay together)
+    """
+    if equivalence_groups is None:
+        equivalence_groups = {}
+
+    def get_group(req_id: str) -> str:
+        return equivalence_groups.get(req_id, req_id)
+
+    # Build a graph of ordering constraints between GROUPS
+    # If group(A) appears before group(B) in any document, we add an edge group(A) -> group(B)
+    graph = defaultdict(set)  # group -> set of groups that must come after
+    in_degree = defaultdict(int)  # count of incoming edges per group
+    all_groups = set()
+    group_members = defaultdict(list)  # group -> list of requirement IDs in this group (ordered by first appearance)
+    seen_members = set()
+
+    for pfs_reqs in requirements_by_pfs:
+        for i, req_id in enumerate(pfs_reqs):
+            group = get_group(req_id)
+            all_groups.add(group)
+
+            # Track members of each group (preserve first-appearance order)
+            if req_id not in seen_members:
+                group_members[group].append(req_id)
+                seen_members.add(req_id)
+
+            # Add edges to all subsequent GROUPS in this document
+            for j in range(i + 1, len(pfs_reqs)):
+                successor = pfs_reqs[j]
+                successor_group = get_group(successor)
+
+                # Don't add edge within the same group
+                if group != successor_group and successor_group not in graph[group]:
+                    graph[group].add(successor_group)
+                    in_degree[successor_group] += 1
+
+    # Initialize in_degree for groups with no incoming edges
+    for group in all_groups:
+        if group not in in_degree:
+            in_degree[group] = 0
+
+    # Kahn's algorithm for topological sort on groups
+    queue = [group for group in all_groups if in_degree[group] == 0]
+    queue.sort()
+
+    sorted_groups = []
+    while queue:
+        group = queue.pop(0)
+        sorted_groups.append(group)
+
+        successors = sorted(graph[group])
+        for successor in successors:
+            in_degree[successor] -= 1
+            if in_degree[successor] == 0:
+                import bisect
+                bisect.insort(queue, successor)
+
+    # Check for cycles
+    if len(sorted_groups) != len(all_groups):
+        # Fall back to simple ordering by first appearance if cycle detected
+        seen = set()
+        sorted_groups = []
+        for pfs_reqs in requirements_by_pfs:
+            for req_id in pfs_reqs:
+                group = get_group(req_id)
+                if group not in seen:
+                    seen.add(group)
+                    sorted_groups.append(group)
+
+    # Expand groups back to individual requirement IDs
+    result = []
+    for group in sorted_groups:
+        result.extend(group_members[group])
+
+    return result
 
 
 def unique_merge(existing, additional, key=None):
@@ -62,6 +163,11 @@ def combine_pfs(multi_pfs):
     }
     categories = {}
     requirements = {}
+    # Track requirement order per category per PFS for topological sorting
+    requirement_orders = defaultdict(list)  # cat_id -> list of [req_id lists per pfs]
+    # Track equivalence groups: requirements with the same title should be grouped together
+    equivalence_groups = defaultdict(dict)  # cat_id -> {req_id: group_key}
+    title_to_group = defaultdict(dict)  # cat_id -> {title: group_key}
 
     for pfs in multi_pfs.values():
         data["id"].append(pfs["id"])
@@ -84,20 +190,38 @@ def combine_pfs(multi_pfs):
                         existing.append(member)
 
         for block in pfs["requirements"]:
-            cid = block["category"]["id"]
-            if cid not in categories:
-                categories[cid] = block["category"]
-                requirements[cid] = {}
+            cat_id = block["category"]["id"]
+            if cat_id not in categories:
+                categories[cat_id] = block["category"]
+                requirements[cat_id] = {}
 
-            for i, item in enumerate(block["requirements"]):
-                iid = item["id"]
-                if iid not in requirements[cid]:
+            # Collect the order of requirements for this PFS
+            pfs_req_order = []
+            for item in block["requirements"]:
+                req_id = item["id"]
+                req_title = item.get("title", "")
+                pfs_req_order.append(req_id)
+
+                # Build equivalence groups based on title
+                # Requirements with the same title get the same group key
+                if req_title:
+                    if req_title in title_to_group[cat_id]:
+                        # Use existing group key for this title
+                        equivalence_groups[cat_id][req_id] = title_to_group[cat_id][req_title]
+                    else:
+                        # Create new group with this req_id as the group key
+                        title_to_group[cat_id][req_title] = req_id
+                        equivalence_groups[cat_id][req_id] = req_id
+
+                # Store which PFS this requirement applies to
+                if req_id not in requirements[cat_id]:
                     item = item.copy()
-                    item["priority"] = i
                     item["applies_to"] = [pfs["id"]]
-                    requirements[cid][iid] = item
+                    requirements[cat_id][req_id] = item
                 else:
-                    requirements[cid][iid]["applies_to"].append(pfs["id"])
+                    requirements[cat_id][req_id]["applies_to"].append(pfs["id"])
+
+            requirement_orders[cat_id].append(pfs_req_order)
 
     data["id"] = "+".join(data["id"])
     data["title"] = "Combined: " + " / ".join(data["title"])
@@ -107,10 +231,17 @@ def combine_pfs(multi_pfs):
     data["references"] = list(data["references"])
     data["annexes"] = list(data["annexes"].values())
     data["authors"] = list(data["authors"].values())
+
     for value in categories.values():
-        sorted_requirements = sorted(
-            requirements[value["id"]].values(), key=lambda x: x["priority"]
+        cat_id = value["id"]
+        # Use topological sort to merge requirements from all PFS documents
+        # Pass equivalence groups so requirements with same title stay together
+        sorted_req_ids = topological_sort_requirements(
+            requirement_orders[cat_id],
+            equivalence_groups.get(cat_id, {})
         )
+        sorted_requirements = [requirements[cat_id][req_id] for req_id in sorted_req_ids]
+
         data["requirements"].append(
             {
                 "category": value,
