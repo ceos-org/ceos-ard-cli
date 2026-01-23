@@ -30,6 +30,7 @@ def read_pfs(pfs, input_dir: Path):
     document, authors, requirements = check_pfs(pfs, base_path)
 
     data = read_yaml(document, PFS_DOCUMENT, base_path)
+    data["id"] = pfs
     data["authors"] = read_yaml(authors, AUTHORS, base_path)
     data["requirements"] = read_yaml(requirements, REQUIREMENTS, base_path)
     return data

@@ -80,7 +80,6 @@ SECTION = lambda file, base_path: Map(
 
 PFS_DOCUMENT = lambda file, base_path: Map(
     {
-        "id": Str(),
         "title": Str(),
         "version": Str(),
         "type": Str(),
