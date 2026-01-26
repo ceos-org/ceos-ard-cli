@@ -43,7 +43,7 @@ To compile a PFS document to a Markdown file, run:
 - With Pixi: `ceos-ard compile SR`
 - With traditional setup: `ceos-ard compile SR`
 
-The last part is the PFS to create, e.g. `SR` or `SAR-NRB`.
+The last part is the PFS to create, e.g. `SR` or `NRB`.
 
 Check `ceos-ard compile --help` (or `ceos-ard compile --help`) for more details.
 
@@ -54,10 +54,10 @@ To create the Word, HTML, and PDF versions of a single PFS, run:
 - With Pixi: `ceos-ard generate SR`
 - With traditional setup: `ceos-ard generate SR`
 
-The last part is the PFS to create, e.g. `SR` or `SAR-NRB`.
+The last part is the PFS to create, e.g. `SR` or `NRB`.
 
 To create a combined PFS, e.g. SAR, the following command can be used:
-`ceos-ard generate SAR-NRB SAR-POL SAR-ORB SAR-GSLC -o ../ceos-ard-spec/build/ -i ../ceos-ard-spec --docx --title="Combined Synthetic Aperture Radar" --version="1.1" --pfs-type="SAR" --id="SAR"`
+`ceos-ard generate NRB POL ORB GSLC -o ../ceos-ard-spec/build/ -i ../ceos-ard-spec --docx --title="Combined Synthetic Aperture Radar" --version="1.1" --pfs-type="SAR" --id="SAR"`
 
 Check `ceos-ard generate --help` (or `ceos-ard generate --help`) for more details.
 
