@@ -16,12 +16,19 @@ CLI for working with the [CEOS-ARD building blocks and PFSes](https://github.com
 
 In order to make working with CEOS-ARD easier we have developed command-line interface (CLI) tools.
 
+> [!TIP]
+> Most people won't need to install this tool.
+> Instead, you can use the [CEOS-ARD Editor](https://editor.ceos-ard.moregeo.it)
+> to edit and/or generate the CEOS-ARD PFS documents.
+
 ### Installation
 
 [Pixi](https://pixi.sh/) is a modern package management tool that handles both conda and PyPI dependencies.
 
-1. Install Pixi by following the [installation instructions](https://pixi.sh/latest/#installation)
-2. Clone this repository: `git clone https://github.com/ceos-org/ceos-ard-cli`
+1. Install Pixi by following the [installation instructions](https://pixi.sh/latest/#installation) (don't follow the "Get Started" instructions, you only need to run the single command provided in the "Installation" section).
+2. Clone this repository and the ceos-ard repository:
+   - `git clone https://github.com/ceos-org/ceos-ard`
+   - `git clone https://github.com/ceos-org/ceos-ard-cli`
 3. Navigate to the directory: `cd ceos-ard-cli`
 4. Install dependencies: `pixi install`
 5. Install browser for PDF rendering: `pixi run install-browser`
@@ -29,7 +36,7 @@ In order to make working with CEOS-ARD easier we have developed command-line int
 ### Run the CLI
 
 1. Run `pixi shell`
-2. Switch into the folder that contains the contents of the `ceos-ard` repository
+2. Switch into the folder that contains the contents of the `ceos-ard` repository: `cd ../ceos-ard`
 3. Run `ceos-ard` with the command you want to execute, e.g. `ceos-ard generate-all -o build`
 
 See the [available commands](#commands) for further details.
