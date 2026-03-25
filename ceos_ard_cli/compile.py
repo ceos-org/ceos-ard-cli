@@ -158,7 +158,7 @@ def combine_pfs(multi_pfs):
         "glossary": {},
         "references": set(),
         "annexes": {},
-        "authors": {},
+        "authors": "",
         "requirements": [],
     }
     categories = {}
@@ -178,16 +178,6 @@ def combine_pfs(multi_pfs):
         data["glossary"] = to_id_dict(pfs["glossary"])
         data["references"].update(pfs["references"])
         data["annexes"] = to_id_dict(pfs["annexes"])
-
-        for organization in pfs["authors"]:
-            key = organization["name"] + organization.get("country", "")
-            if key not in data["authors"]:
-                data["authors"][key] = organization
-            else:
-                existing = data["authors"][key]["members"]
-                for member in organization["members"]:
-                    if member not in existing:
-                        existing.append(member)
 
         for block in pfs["requirements"]:
             cat_id = block["category"]["id"]
@@ -230,7 +220,6 @@ def combine_pfs(multi_pfs):
     data["glossary"] = list(data["glossary"].values())
     data["references"] = list(data["references"])
     data["annexes"] = list(data["annexes"].values())
-    data["authors"] = list(data["authors"].values())
 
     for value in categories.values():
         cat_id = value["id"]
@@ -283,6 +272,10 @@ def compile(
         data = combine_pfs(multi_pfs)
     else:
         data = multi_pfs[pfs[0]]
+
+    if isinstance(data["authors"], list):
+        # Convert list of authors to Markdown
+        data["authors"] = "\n".join(map(lambda a: f"- {a}", data["authors"]))
 
     # Override metadata if provided
     data["id"] = metadata.get("id") or data["id"]

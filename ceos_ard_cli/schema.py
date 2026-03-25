@@ -12,7 +12,6 @@ from strictyaml import (
 
 from .strictyaml.id_reference import IdReference
 from .strictyaml.markdown import Markdown
-from .strictyaml.md_reference import MdReference
 
 REFERENCE_PATH = "./references/{id}.bib"
 GLOSSARY_PATH = "./glossary/{id}.yaml"
@@ -35,14 +34,10 @@ _RESOLVED_REFS = lambda path, base_path, schema: _REFS(
 _RESOLVED_SECTIONS = lambda path, base_path: _RESOLVED_REFS(path, base_path, SECTION)
 _REFERENCE_IDS = lambda base_path: _REFS(REFERENCE_PATH, base_path)
 
-_MARKDOWN = lambda file, base_path: Markdown() | MdReference(
-    file, base_path
-)  # The order is important
-
-_REQUIREMENT_PART = lambda file, base_path: NullNone() | Map({
-    "description": _MARKDOWN(file, base_path),
+_REQUIREMENT_PART = NullNone() | Map({
+    "description": Markdown(),
     Optional("notes", default=[]): EmptyList()
-    | Seq(_MARKDOWN(file, base_path) | MdReference(file, base_path)),
+    | Seq(Markdown()),
 })
 
 _CHANGES = EmptyList() | Seq(Map({
@@ -56,7 +51,7 @@ _CHANGES = EmptyList() | Seq(Map({
 GLOSSARY = lambda file, base_path: Map({
     Optional("filepath", default=fix_path(file)): Str(),
     "term": Str(),
-    "description": _MARKDOWN(file, base_path),
+    "description": Markdown(),
 })
 _RESOLVED_GLOSSARY = lambda base_path: _RESOLVED_REFS(
     GLOSSARY_PATH, base_path, GLOSSARY
@@ -66,7 +61,7 @@ SECTION = lambda file, base_path: Map({
     Optional("filepath", default=fix_path(file)): Str(),
     Optional("id", default=""): Str(),
     "title": Str(),
-    "description": _MARKDOWN(file, base_path),
+    "description": Markdown(),
     Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
     Optional("references", default=[]): _REFERENCE_IDS(base_path),
     Optional("changes", default=[]): _CHANGES,
@@ -76,12 +71,8 @@ PFS_DOCUMENT = lambda file, base_path: Map({
     "title": Str(),
     "version": Str(),
     "type": Str(),
-    "applies_to": _MARKDOWN(file, base_path),
-    "authors": Seq(Map({
-        "name": Str(),
-        Optional("country", default=""): Str(),
-        "members": UniqueSeq(Str()),
-    })),
+    "applies_to": Markdown(),
+    "authors": Markdown() | Seq(Str()),
     Optional("introduction", default=[]): _RESOLVED_SECTIONS(
         INTRODUCTION_PATH, base_path
     ),
@@ -101,8 +92,8 @@ REQUIREMENT = lambda file, base_path: Map({
     Optional("filepath", default=fix_path(file)): Str(),
     "title": Str(),
     Optional("description", default=""): Str(),
-    "threshold": _REQUIREMENT_PART(file, base_path),
-    "goal": _REQUIREMENT_PART(file, base_path),
+    "threshold": _REQUIREMENT_PART,
+    "goal": _REQUIREMENT_PART,
     Optional("dependencies", default=[]): _REFS(
         REQUIREMENT_PATH, base_path, REQUIREMENT
     ),
