@@ -3,6 +3,10 @@ from pathlib import Path
 FILE_CACHE = {}
 
 
+def fix_path(path):
+    return str(path).replace("\\", "/")
+
+
 def read_file(file):
     filepath = Path(file)
     key = str(filepath.absolute())

@@ -40,12 +40,12 @@ def cli():
     help="Adds an 'Assessment' section to the requirements (for editable Word documents)",
 )
 @click.option(
-    "--json",
+    "--debug",
     is_flag=True,
     default=False,
-    help="Outputs a JSON file for debugging purposes",
+    help="Enables debugging mode, e.g. outputs a JSON file for debugging purposes and gives a stacktrace",
 )
-def compile(pfs, output, input_dir, editable, json):
+def compile(pfs, output, input_dir, editable, debug):
     """
     Compiles the Markdown file for the given PFS.
     """
@@ -56,10 +56,13 @@ def compile(pfs, output, input_dir, editable, json):
         output = "-".join(pfs)
 
     try:
-        compile_(pfs, output, input_dir, editable=editable, debug=json)
+        compile_(pfs, output, input_dir, editable=editable, debug=debug)
     except Exception as e:
-        print(e)
-        sys.exit(1)
+        if debug:
+            raise e
+        else:
+            print(e)
+            sys.exit(1)
 
 
 @click.command()

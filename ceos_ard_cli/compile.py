@@ -1,18 +1,19 @@
 import shutil
+from collections import defaultdict
 from pathlib import Path
 from typing import Union
-from collections import defaultdict
 
-from .schema import REFERENCE_PATH
-from .utils.files import read_file, write_file
+from mergedeep import Strategy, merge
+
+from .schema import REFERENCE_PATH, get_empty_requirement_part
+from .utils.files import fix_path, read_file, write_file
 from .utils.pfs import read_pfs
 from .utils.requirement import slugify
 from .utils.template import read_template
 
 
 def topological_sort_requirements(
-    requirements_by_pfs: list[list[str]],
-    equivalence_groups: dict[str, str] = None
+    requirements_by_pfs: list[list[str]], equivalence_groups: dict[str, str] = None
 ) -> list[str]:
     """
     Topologically sort requirements while preserving relative order from each PFS document.
@@ -46,7 +47,9 @@ def topological_sort_requirements(
     graph = defaultdict(set)  # group -> set of groups that must come after
     in_degree = defaultdict(int)  # count of incoming edges per group
     all_groups = set()
-    group_members = defaultdict(list)  # group -> list of requirement IDs in this group (ordered by first appearance)
+    group_members = defaultdict(
+        list
+    )  # group -> list of requirement IDs in this group (ordered by first appearance)
     seen_members = set()
 
     for pfs_reqs in requirements_by_pfs:
@@ -88,6 +91,7 @@ def topological_sort_requirements(
             in_degree[successor] -= 1
             if in_degree[successor] == 0:
                 import bisect
+
                 bisect.insort(queue, successor)
 
     # Check for cycles
@@ -197,7 +201,9 @@ def combine_pfs(multi_pfs):
                 if req_title:
                     if req_title in title_to_group[cat_id]:
                         # Use existing group key for this title
-                        equivalence_groups[cat_id][req_id] = title_to_group[cat_id][req_title]
+                        equivalence_groups[cat_id][req_id] = title_to_group[cat_id][
+                            req_title
+                        ]
                     else:
                         # Create new group with this req_id as the group key
                         title_to_group[cat_id][req_title] = req_id
@@ -226,10 +232,11 @@ def combine_pfs(multi_pfs):
         # Use topological sort to merge requirements from all PFS documents
         # Pass equivalence groups so requirements with same title stay together
         sorted_req_ids = topological_sort_requirements(
-            requirement_orders[cat_id],
-            equivalence_groups.get(cat_id, {})
+            requirement_orders[cat_id], equivalence_groups.get(cat_id, {})
         )
-        sorted_requirements = [requirements[cat_id][req_id] for req_id in sorted_req_ids]
+        sorted_requirements = [
+            requirements[cat_id][req_id] for req_id in sorted_req_ids
+        ]
 
         data["requirements"].append(
             {
@@ -311,7 +318,24 @@ def compile_bibtex(data, out, input_dir: Path):
 
 # make uid unique so that it can be used in multiple categories
 def create_uid(block, req_id):
-    return slugify(block["category"]["id"] + "." + req_id)
+    return slugify(block["category"]["id"] + "-" + req_id)
+
+
+def path_to_id(filepath, input_dir):
+    req_dir = Path(input_dir) / "requirements"
+    rel_path = fix_path(Path(filepath).relative_to(req_dir))
+    if rel_path.endswith(".yaml"):
+        rel_path = rel_path[:-5]
+    return rel_path
+
+
+def append_requirement(target, req):
+    if len(target["description"]) > 0:
+        target["description"] += "\n\n" + req["description"]
+    else:
+        target["description"] = req["description"]
+    target["notes"].extend(req["notes"])
+    target["metadata"].update(req["metadata"])
 
 
 def compile_markdown(data, out, editable, input_dir: Path):
@@ -322,14 +346,40 @@ def compile_markdown(data, out, editable, input_dir: Path):
     context["editable"] = editable
     # sort glossary
     context["glossary"] = sorted(context["glossary"], key=lambda x: x["term"].lower())
-    # todo: implement automatic creation of history based on git logs?
-    # todo: alternatively, add changelog to the individual files with a timestamp and compile it from there
-    context["history"] = "Not available yet"
+    # todo: Derive changelogs automatically
 
     # make a dict of all requirements for efficient dependency lookup
     all_requirements = {}
     # make a dict of the requirements in this category for efficient dependency lookup
     local_requirements = {}
+
+    # Merge
+    for block in context["requirements"]:
+        for idx, req in enumerate(block["requirements"]):
+            # 1) Merge requirement overrides
+            if "ref" in req and "override" in req:
+                req = merge(
+                    req["ref"], req["override"], strategy=Strategy.TYPESAFE_REPLACE
+                )
+                block["requirements"][idx] = req
+
+            # 2) Merge individual requirements into goal and threshold requirements
+            threshold = None
+            goal = None
+            for reqname in req["requirements"]:
+                subreq = req["requirements"][reqname]
+                if subreq.get("optional", False):
+                    if goal is None:
+                        goal = get_empty_requirement_part()
+                    append_requirement(goal, subreq)
+                else:
+                    if threshold is None:
+                        threshold = get_empty_requirement_part()
+                    append_requirement(threshold, subreq)
+
+            req["threshold"] = threshold
+            req["goal"] = goal
+
     # generate uid for each requirement and fill dependency lookups
     for block in context["requirements"]:
         cid = block["category"]["id"]
@@ -337,8 +387,9 @@ def compile_markdown(data, out, editable, input_dir: Path):
         for req in block["requirements"]:
             # make uid unique if it can be used in multiple categories
             req["uid"] = create_uid(block, req["id"])
-            local_requirements[cid][req["id"]] = req["uid"]
-            all_requirements[req["id"]] = req["uid"]
+            rel_path = path_to_id(req["filepath"], input_dir)
+            local_requirements[cid][rel_path] = req["uid"]
+            all_requirements[rel_path] = req["uid"]
 
     # resolve dependencies
     for block in context["requirements"]:
@@ -352,8 +403,9 @@ def compile_markdown(data, out, editable, input_dir: Path):
                 elif id in all_requirements:
                     ref_id = all_requirements[id]
                 else:
+                    rel_path = path_to_id(id, input_dir)
                     raise ValueError(
-                        f"Unmet dependency {id} for requirement {req['uid']}"
+                        f"Unmet dependency {id} for requirement {rel_path}"
                     )
 
                 req["dependencies"][i] = ref_id
@@ -371,20 +423,21 @@ def update_requirement_references(req, old_id, new_id):
     req["description"] = update_requirement_reference(
         req["description"], old_id, new_id
     )
-    if req["threshold"] is not None:
-        req["threshold"]["description"] = update_requirement_reference(
-            req["threshold"]["description"], old_id, new_id
-        )
-        req["threshold"]["notes"] = update_requirement_reference(
-            req["threshold"]["notes"], old_id, new_id
-        )
-    if req["goal"] is not None:
-        req["goal"]["description"] = update_requirement_reference(
-            req["goal"]["description"], old_id, new_id
-        )
-        req["goal"]["notes"] = update_requirement_reference(
-            req["goal"]["notes"], old_id, new_id
-        )
+
+    for key in req["requirements"]:
+        update_requirement_part_references(req["requirements"][key], old_id, new_id)
+
+    if req.get("threshold"):
+        update_requirement_part_references(req["threshold"], old_id, new_id)
+    if req.get("goal"):
+        update_requirement_part_references(req["goal"], old_id, new_id)
+
+
+def update_requirement_part_references(part, old_id, new_id):
+    part["description"] = update_requirement_reference(
+        part["description"], old_id, new_id
+    )
+    part["notes"] = update_requirement_reference(part["notes"], old_id, new_id)
 
 
 # replace all requirement references in the given texts with the resolved references
