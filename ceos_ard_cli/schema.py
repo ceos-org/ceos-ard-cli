@@ -30,6 +30,9 @@ _REFS = lambda path, base_path, schema=None, resolve=False: (
 _RESOLVED_REFS = lambda path, base_path, schema: _REFS(path, base_path, schema, resolve=True)
 _RESOLVED_SECTIONS = lambda path, base_path: _RESOLVED_REFS(path, base_path, SECTION)
 _REFERENCE_IDS = lambda base_path: _REFS(REFERENCE_PATH, base_path)
+_DEPS = lambda path, base_path, schema=None: (
+    EmptyDict() | MapPattern(Str(), IdReference(path, base_path, schema, resolve=False))
+)
 
 _REQUIREMENT_PART = Map(
     {
@@ -108,7 +111,7 @@ REQUIREMENT = lambda file, base_path: Map(
         "title": Str(),
         Optional("description", default=""): Markdown(),
         "requirements": MapPattern(Str(), _REQUIREMENT_PART),
-        Optional("dependencies", default=[]): _REFS(REQUIREMENT_PATH, base_path, REQUIREMENT),
+        Optional("dependencies", default={}): _DEPS(REQUIREMENT_PATH, base_path, REQUIREMENT),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("changes", default=[]): _CHANGES,
@@ -121,7 +124,7 @@ PARTIAL_REQUIREMENT = lambda file, base_path: Map(
         Optional("title"): Str(),
         Optional("description"): Markdown(),
         Optional("requirements"): MapPattern(Str(), _REQUIREMENT_PART_OVERRIDE),
-        Optional("dependencies"): _REFS(REQUIREMENT_PATH, base_path, REQUIREMENT),
+        Optional("dependencies"): _DEPS(REQUIREMENT_PATH, base_path, REQUIREMENT),
         Optional("glossary"): _RESOLVED_GLOSSARY(base_path),
         Optional("references"): _REFERENCE_IDS(base_path),
         Optional("changes"): _CHANGES,

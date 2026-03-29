@@ -372,6 +372,16 @@ def path_to_id(filepath, input_dir):
     return rel_path
 
 
+def _resolve_dep_path(path, cid, local_requirements, all_requirements, input_dir):
+    """Resolve a dependency path to a requirement UID."""
+    if path in local_requirements[cid]:
+        return local_requirements[cid][path]
+    elif path in all_requirements:
+        return all_requirements[path]
+    else:
+        raise ValueError(f"Unmet dependency '{path}' in category '{cid}'")
+
+
 def append_requirement(target, req):
     if len(target["description"]) > 0:
         target["description"] += "\n\n" + req["description"]
@@ -430,20 +440,12 @@ def compile_markdown(data, out, editable, input_dir: Path):
     for block in context["requirements"]:
         cid = block["category"]["id"]
         for req in block["requirements"]:
-            for i, id in enumerate(req["dependencies"]):
-                # 1. Check to the requirement in the same requirement category.
-                if id in local_requirements[cid]:
-                    ref_id = local_requirements[cid][id]
-                # 2. Refers to the requirement in any other category.
-                elif id in all_requirements:
-                    ref_id = all_requirements[id]
-                else:
-                    rel_path = path_to_id(id, input_dir)
-                    raise ValueError(f"Unmet dependency {id} for requirement {rel_path}")
-
-                req["dependencies"][i] = ref_id
-                # Update the requirements in the texts
-                update_requirement_references(req, id, ref_id)
+            resolved_deps = []
+            for alias, path in req["dependencies"].items():
+                ref_id = _resolve_dep_path(path, cid, local_requirements, all_requirements, input_dir)
+                resolved_deps.append(ref_id)
+                update_requirement_references(req, alias, ref_id)
+            req["dependencies"] = resolved_deps
 
     # read, fill and write the template
     template = read_template(input_dir)
