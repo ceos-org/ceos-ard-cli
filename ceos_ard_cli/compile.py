@@ -3,8 +3,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Union
 
-from mergedeep import Strategy, merge
-
 from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.files import fix_path, read_file, write_file
 from .utils.pfs import read_pfs
@@ -240,6 +238,58 @@ def combine_pfs(multi_pfs):
     return data
 
 
+def deep_replace(base, overrides):
+    """Deep merge where override values replace base values."""
+    result = base.copy()
+    for key, value in overrides.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_replace(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def deep_append(base, additions):
+    """Deep merge where addition values are appended to base values."""
+    result = base.copy()
+    for key, value in additions.items():
+        if key not in result:
+            result[key] = value
+        elif isinstance(result[key], str) and isinstance(value, str):
+            if len(result[key]) > 0:
+                result[key] += "\n\n" + value
+            else:
+                result[key] = value
+        elif isinstance(result[key], list) and isinstance(value, list):
+            result[key] = result[key] + value
+        elif isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = deep_append(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def resolve_ref(item):
+    """Resolve a single ref/replace/append pattern into a flat structure."""
+    if isinstance(item, dict) and "ref" in item:
+        result = item["ref"]
+        if item.get("replace"):
+            result = deep_replace(result, item["replace"])
+        if item.get("append"):
+            result = deep_append(result, item["append"])
+        return result
+    return item
+
+
+def resolve_refs(data):
+    """Resolve all ref/replace/append patterns in PFS data."""
+    for block in data["requirements"]:
+        block["category"] = resolve_ref(block["category"])
+        for idx, req in enumerate(block["requirements"]):
+            block["requirements"][idx] = resolve_ref(req)
+    return data
+
+
 def compile(
     pfs: Union[list[str], str],
     out: Union[Path, str],
@@ -263,9 +313,10 @@ def compile(
 
     multi_pfs = {}
     for p in pfs:
-        # read the PFS information and
+        # read the PFS information,
+        # resolve ref/replace/append patterns and
         # move the glossary and references to the top level
-        multi_pfs[p] = bubble_up(read_pfs(p, input_dir))
+        multi_pfs[p] = bubble_up(resolve_refs(read_pfs(p, input_dir)))
 
     if len(pfs) > 1:
         data = combine_pfs(multi_pfs)
@@ -345,15 +396,9 @@ def compile_markdown(data, out, editable, input_dir: Path):
     # make a dict of the requirements in this category for efficient dependency lookup
     local_requirements = {}
 
-    # Merge
+    # Merge individual requirements into goal and threshold requirements
     for block in context["requirements"]:
         for idx, req in enumerate(block["requirements"]):
-            # 1) Merge requirement overrides
-            if "ref" in req and "override" in req:
-                req = merge(req["ref"], req["override"], strategy=Strategy.TYPESAFE_REPLACE)
-                block["requirements"][idx] = req
-
-            # 2) Merge individual requirements into goal and threshold requirements
             threshold = None
             goal = None
             for reqname in req["requirements"]:

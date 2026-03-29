@@ -91,12 +91,22 @@ SECTION = lambda file, base_path: Map(
     }
 )
 
+PARTIAL_SECTION = lambda file, base_path: Map(
+    {
+        Optional("title"): Str(),
+        Optional("description"): Markdown(),
+        Optional("glossary"): _RESOLVED_GLOSSARY(base_path),
+        Optional("references"): _REFERENCE_IDS(base_path),
+        Optional("changes"): _CHANGES,
+    }
+)
+
 REQUIREMENT = lambda file, base_path: Map(
     {
         Optional("filepath", default=fix_path(file)): Str(),
         "id": Str(),
         "title": Str(),
-        Optional("description", default=""): Str(),
+        Optional("description", default=""): Markdown(),
         "requirements": MapPattern(Str(), _REQUIREMENT_PART),
         Optional("dependencies", default=[]): _REFS(REQUIREMENT_PATH, base_path, REQUIREMENT),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
@@ -106,15 +116,16 @@ REQUIREMENT = lambda file, base_path: Map(
     }
 )
 
-OVERRIDE_REQUIREMENT = lambda file, base_path: Map(
+PARTIAL_REQUIREMENT = lambda file, base_path: Map(
     {
         Optional("title"): Str(),
-        Optional("description"): Str(),
+        Optional("description"): Markdown(),
         Optional("requirements"): MapPattern(Str(), _REQUIREMENT_PART_OVERRIDE),
         Optional("dependencies"): _REFS(REQUIREMENT_PATH, base_path, REQUIREMENT),
         Optional("glossary"): _RESOLVED_GLOSSARY(base_path),
-        Optional("references", default=[]): _REFERENCE_IDS(base_path),
-        Optional("changes", default=[]): _CHANGES,
+        Optional("references"): _REFERENCE_IDS(base_path),
+        Optional("changes"): _CHANGES,
+        Optional("history"): Seq(Str()),
     }
 )
 
@@ -129,12 +140,20 @@ PFS_DOCUMENT = lambda file, base_path: Map(
         "requirements": Seq(
             Map(
                 {
-                    "category": IdReference(REQUIREMENT_CATEGORY_PATH, base_path, SECTION),
+                    "category": Map(
+                        {
+                            "ref": IdReference(REQUIREMENT_CATEGORY_PATH, base_path, SECTION),
+                            Optional("replace", default={}): EmptyDict() | PARTIAL_SECTION(file, base_path),
+                            Optional("append", default={}): EmptyDict() | PARTIAL_SECTION(file, base_path),
+                        }
+                    )
+                    | IdReference(REQUIREMENT_CATEGORY_PATH, base_path, SECTION),
                     "requirements": Seq(
                         Map(
                             {
                                 "ref": IdReference(REQUIREMENT_PATH, base_path, REQUIREMENT),
-                                "override": OVERRIDE_REQUIREMENT(file, base_path),
+                                Optional("replace", default={}): EmptyDict() | PARTIAL_REQUIREMENT(file, base_path),
+                                Optional("append", default={}): EmptyDict() | PARTIAL_REQUIREMENT(file, base_path),
                             }
                         )
                         | IdReference(REQUIREMENT_PATH, base_path, REQUIREMENT)
