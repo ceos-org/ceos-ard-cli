@@ -73,3 +73,5 @@ test = "pytest tests/"
 check-all = {depends-on = ["format", "lint", "test"]}
 install-dev = "python -m pip install -e ."
 
+[tool.ruff]
+line-length = 120

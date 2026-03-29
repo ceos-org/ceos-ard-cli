@@ -87,9 +87,7 @@ def compile(pfs, output, input_dir, editable, debug):
     help="Generate self-contained HTML files",
 )
 @click.option("--pdf", is_flag=True, default=True, help="Enable/disable PDF generation")
-@click.option(
-    "--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation"
-)
+@click.option("--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation")
 @click.option(
     "--id",
     default=None,
@@ -110,9 +108,7 @@ def compile(pfs, output, input_dir, editable, debug):
     default=None,
     help="Overrides the PFS type of the document",
 )
-def generate(
-    pfs, output, input_dir, self_contained, pdf, docx, id, title, version, pfs_type
-):
+def generate(pfs, output, input_dir, self_contained, pdf, docx, id, title, version, pfs_type):
     """
     Generates the Word and HTML files for the given PFS.
 
@@ -159,9 +155,7 @@ def generate(
     help="Generate self-contained HTML files",
 )
 @click.option("--pdf", is_flag=True, default=True, help="Enable/disable PDF generation")
-@click.option(
-    "--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation"
-)
+@click.option("--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation")
 @click.option(
     "--pfs",
     "-p",

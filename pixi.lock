@@ -524,7 +524,7 @@ packages:
 - pypi: ./
   name: ceos-ard-cli
   version: 0.4.0
-  sha256: 1e23adf1fd047d252595c68f1038ef9ba461c0ddcb56aec00bc10f63360faeba
+  sha256: 04e5c02c729e9f216867943f7b7874c0026a600a643b348cd01d962941f59866
   requires_dist:
   - bibtexparser==2.0.0b8
   - click>=8.0.0,<9

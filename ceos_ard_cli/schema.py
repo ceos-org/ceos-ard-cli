@@ -27,9 +27,7 @@ REQUIREMENT_PATH = "./requirements/{id}.yaml"
 _REFS = lambda path, base_path, schema=None, resolve=False: (
     EmptyList() | UniqueSeq(IdReference(path, base_path, schema, resolve))
 )
-_RESOLVED_REFS = lambda path, base_path, schema: _REFS(
-    path, base_path, schema, resolve=True
-)
+_RESOLVED_REFS = lambda path, base_path, schema: _REFS(path, base_path, schema, resolve=True)
 _RESOLVED_SECTIONS = lambda path, base_path: _RESOLVED_REFS(path, base_path, SECTION)
 _REFERENCE_IDS = lambda base_path: _REFS(REFERENCE_PATH, base_path)
 
@@ -63,7 +61,7 @@ def get_empty_requirement_part():
 _CHANGES = EmptyList() | Seq(
     Map(
         {
-            "date": Regex(r"\d{4}-\d{2}-\d{2}"), # ISO date format
+            "date": Regex(r"\d{4}-\d{2}-\d{2}"),  # ISO date format
             "author": Str(),
             "change": Markdown(),
             "reason": Str(),
@@ -79,9 +77,7 @@ GLOSSARY = lambda file, base_path: Map(
         "description": Markdown(),
     }
 )
-_RESOLVED_GLOSSARY = lambda base_path: _RESOLVED_REFS(
-    GLOSSARY_PATH, base_path, GLOSSARY
-)
+_RESOLVED_GLOSSARY = lambda base_path: _RESOLVED_REFS(GLOSSARY_PATH, base_path, GLOSSARY)
 
 SECTION = lambda file, base_path: Map(
     {
@@ -102,9 +98,7 @@ REQUIREMENT = lambda file, base_path: Map(
         "title": Str(),
         Optional("description", default=""): Str(),
         "requirements": MapPattern(Str(), _REQUIREMENT_PART),
-        Optional("dependencies", default=[]): _REFS(
-            REQUIREMENT_PATH, base_path, REQUIREMENT
-        ),
+        Optional("dependencies", default=[]): _REFS(REQUIREMENT_PATH, base_path, REQUIREMENT),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("changes", default=[]): _CHANGES,
@@ -131,21 +125,15 @@ PFS_DOCUMENT = lambda file, base_path: Map(
         "type": Str(),
         "applies_to": Markdown(),
         "authors": Markdown() | Seq(Str()),
-        Optional("introduction", default=[]): _RESOLVED_SECTIONS(
-            INTRODUCTION_PATH, base_path
-        ),
+        Optional("introduction", default=[]): _RESOLVED_SECTIONS(INTRODUCTION_PATH, base_path),
         "requirements": Seq(
             Map(
                 {
-                    "category": IdReference(
-                        REQUIREMENT_CATEGORY_PATH, base_path, SECTION
-                    ),
+                    "category": IdReference(REQUIREMENT_CATEGORY_PATH, base_path, SECTION),
                     "requirements": Seq(
                         Map(
                             {
-                                "ref": IdReference(
-                                    REQUIREMENT_PATH, base_path, REQUIREMENT
-                                ),
+                                "ref": IdReference(REQUIREMENT_PATH, base_path, REQUIREMENT),
                                 "override": OVERRIDE_REQUIREMENT(file, base_path),
                             }
                         )

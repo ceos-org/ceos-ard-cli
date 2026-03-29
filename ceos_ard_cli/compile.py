@@ -47,9 +47,7 @@ def topological_sort_requirements(
     graph = defaultdict(set)  # group -> set of groups that must come after
     in_degree = defaultdict(int)  # count of incoming edges per group
     all_groups = set()
-    group_members = defaultdict(
-        list
-    )  # group -> list of requirement IDs in this group (ordered by first appearance)
+    group_members = defaultdict(list)  # group -> list of requirement IDs in this group (ordered by first appearance)
     seen_members = set()
 
     for pfs_reqs in requirements_by_pfs:
@@ -201,9 +199,7 @@ def combine_pfs(multi_pfs):
                 if req_title:
                     if req_title in title_to_group[cat_id]:
                         # Use existing group key for this title
-                        equivalence_groups[cat_id][req_id] = title_to_group[cat_id][
-                            req_title
-                        ]
+                        equivalence_groups[cat_id][req_id] = title_to_group[cat_id][req_title]
                     else:
                         # Create new group with this req_id as the group key
                         title_to_group[cat_id][req_title] = req_id
@@ -231,12 +227,8 @@ def combine_pfs(multi_pfs):
         cat_id = value["id"]
         # Use topological sort to merge requirements from all PFS documents
         # Pass equivalence groups so requirements with same title stay together
-        sorted_req_ids = topological_sort_requirements(
-            requirement_orders[cat_id], equivalence_groups.get(cat_id, {})
-        )
-        sorted_requirements = [
-            requirements[cat_id][req_id] for req_id in sorted_req_ids
-        ]
+        sorted_req_ids = topological_sort_requirements(requirement_orders[cat_id], equivalence_groups.get(cat_id, {}))
+        sorted_requirements = [requirements[cat_id][req_id] for req_id in sorted_req_ids]
 
         data["requirements"].append(
             {
@@ -358,9 +350,7 @@ def compile_markdown(data, out, editable, input_dir: Path):
         for idx, req in enumerate(block["requirements"]):
             # 1) Merge requirement overrides
             if "ref" in req and "override" in req:
-                req = merge(
-                    req["ref"], req["override"], strategy=Strategy.TYPESAFE_REPLACE
-                )
+                req = merge(req["ref"], req["override"], strategy=Strategy.TYPESAFE_REPLACE)
                 block["requirements"][idx] = req
 
             # 2) Merge individual requirements into goal and threshold requirements
@@ -404,9 +394,7 @@ def compile_markdown(data, out, editable, input_dir: Path):
                     ref_id = all_requirements[id]
                 else:
                     rel_path = path_to_id(id, input_dir)
-                    raise ValueError(
-                        f"Unmet dependency {id} for requirement {rel_path}"
-                    )
+                    raise ValueError(f"Unmet dependency {id} for requirement {rel_path}")
 
                 req["dependencies"][i] = ref_id
                 # Update the requirements in the texts
@@ -420,9 +408,7 @@ def compile_markdown(data, out, editable, input_dir: Path):
 
 # replace all requirement references in the texts with the resolved references
 def update_requirement_references(req, old_id, new_id):
-    req["description"] = update_requirement_reference(
-        req["description"], old_id, new_id
-    )
+    req["description"] = update_requirement_reference(req["description"], old_id, new_id)
 
     for key in req["requirements"]:
         update_requirement_part_references(req["requirements"][key], old_id, new_id)
@@ -434,9 +420,7 @@ def update_requirement_references(req, old_id, new_id):
 
 
 def update_requirement_part_references(part, old_id, new_id):
-    part["description"] = update_requirement_reference(
-        part["description"], old_id, new_id
-    )
+    part["description"] = update_requirement_reference(part["description"], old_id, new_id)
     part["notes"] = update_requirement_reference(part["notes"], old_id, new_id)
 
 
