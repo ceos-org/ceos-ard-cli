@@ -154,6 +154,7 @@ def combine_pfs(multi_pfs):
         "version": "",
         "type": set(),
         "applies_to": {},
+        "background": {},
         "introduction": {},
         "glossary": {},
         "references": set(),
@@ -173,7 +174,12 @@ def combine_pfs(multi_pfs):
         data["id"].append(pfs["id"])
         data["title"].append(pfs["title"])
         data["type"].add(pfs["type"])
-        data["applies_to"][pfs["title"]] = pfs["applies_to"]
+        applies_to = pfs.get("applies_to", "").rstrip()
+        if applies_to:
+            data["applies_to"][pfs["title"]] = applies_to
+        background = pfs.get("background", "").rstrip()
+        if background:
+            data["background"][pfs["title"]] = background
         data["introduction"] = to_id_dict(pfs["introduction"])
         data["glossary"] = to_id_dict(pfs["glossary"])
         data["references"].update(pfs["references"])
