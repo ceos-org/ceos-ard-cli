@@ -151,7 +151,7 @@ def combine_pfs(multi_pfs):
         "combined": True,
         "id": [],
         "title": [],
-        "version": "",
+        "version": "n/a",
         "type": set(),
         "applies_to": {},
         "background": {},
@@ -226,6 +226,10 @@ def combine_pfs(multi_pfs):
     data["glossary"] = list(data["glossary"].values())
     data["references"] = list(data["references"])
     data["annexes"] = list(data["annexes"].values())
+
+    if len(set(data["applies_to"].values())) == 1:
+        # If all applies_to are the same, simplify to a single string
+        data["applies_to"] = next(iter(data["applies_to"].values()))
 
     for value in categories.values():
         cat_id = value["id"]
