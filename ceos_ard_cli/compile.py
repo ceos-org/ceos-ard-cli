@@ -349,6 +349,9 @@ def compile(
     elif not stable:
         data["version"] = data["version"] + "-draft"
 
+    if stable:
+        out = out.parent / f"{out.stem}-v{data['version']}"
+
     # write a json file for debugging
     if debug:
         import json
@@ -359,6 +362,8 @@ def compile(
     compile_markdown(data, f"{out}.md", editable, input_dir)
     # write bibtex file to disk
     compile_bibtex(data, f"{out}.bib", input_dir)
+
+    return out
 
 
 def compile_bibtex(data, out, input_dir: Path):

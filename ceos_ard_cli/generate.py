@@ -63,20 +63,20 @@ def generate(
 
     if docx:
         print("- Generating editable Markdown")
-        compile(pfs, output, input_dir, editable=True, stable=stable, metadata=metadata)
+        target = compile(pfs, output, input_dir, editable=True, stable=stable, metadata=metadata)
 
         print("- Generating Word")
-        run_pandoc(output, "docx", input_dir, self_contained)
+        run_pandoc(target, "docx", input_dir, self_contained)
 
     print("- Generating read-only Markdown")
-    compile(pfs, output, input_dir, editable=False, stable=stable, metadata=metadata)
+    target = compile(pfs, output, input_dir, editable=False, stable=stable, metadata=metadata)
 
     print("- Generating HTML")
-    run_pandoc(output, "html", input_dir, self_contained)
+    run_pandoc(target, "html", input_dir, self_contained)
 
     if pdf:
         print("- Generating PDF")
-        run_playwright(output, input_dir)
+        run_playwright(target, input_dir)
 
 
 def run_playwright(out: Path, input_dir: Path):
