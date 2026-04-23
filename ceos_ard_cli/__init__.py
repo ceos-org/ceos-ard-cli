@@ -41,7 +41,7 @@ def cli():
 )
 @click.option(
     "--stable",
-    "-s",
+    "-r",
     is_flag=True,
     default=False,
     help="Removes the '-draft' suffix from the version number, e.g. 0.1.0-draft becomes 0.1.0",
@@ -97,7 +97,7 @@ def compile(pfs, output, input_dir, editable, stable, debug):
 @click.option("--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation")
 @click.option(
     "--stable",
-    "-s",
+    "-r",
     is_flag=True,
     default=False,
     help="Removes the '-draft' suffix from the version number, e.g. 0.1.0-draft becomes 0.1.0",
@@ -178,7 +178,7 @@ def generate(pfs, output, input_dir, self_contained, pdf, docx, stable, id, titl
 )
 @click.option(
     "--stable",
-    "-s",
+    "-r",
     is_flag=True,
     default=False,
     help="Removes the '-draft' suffix from the version number, e.g. 0.1.0-draft becomes 0.1.0",
