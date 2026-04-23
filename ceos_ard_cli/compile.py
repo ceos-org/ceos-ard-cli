@@ -305,6 +305,7 @@ def compile(
     out: Union[Path, str],
     input_dir: Union[Path, str],
     editable: bool = False,
+    stable: bool = False,
     metadata: dict = {},
     debug: bool = False,
 ):
@@ -333,6 +334,8 @@ def compile(
     else:
         data = multi_pfs[pfs[0]]
 
+    data["stable"] = stable
+
     if isinstance(data["authors"], list):
         # Convert list of authors to Markdown
         data["authors"] = "\n".join(map(lambda a: f"- {a}", data["authors"]))
@@ -340,8 +343,11 @@ def compile(
     # Override metadata if provided
     data["id"] = metadata.get("id") or data["id"]
     data["title"] = metadata.get("title") or data["title"]
-    data["version"] = metadata.get("version") or data["version"]
     data["type"] = metadata.get("type") or data["type"]
+    if metadata.get("version"):
+        data["version"] = metadata["version"]
+    elif not stable:
+        data["version"] = data["version"] + "-draft"
 
     # write a json file for debugging
     if debug:

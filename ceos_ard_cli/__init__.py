@@ -40,12 +40,19 @@ def cli():
     help="Adds an 'Assessment' section to the requirements (for editable Word documents)",
 )
 @click.option(
+    "--stable",
+    "-s",
+    is_flag=True,
+    default=False,
+    help="Removes the '-draft' suffix from the version number, e.g. 0.1.0-draft becomes 0.1.0",
+)
+@click.option(
     "--debug",
     is_flag=True,
     default=False,
     help="Enables debugging mode, e.g. outputs a JSON file for debugging purposes and gives a stacktrace",
 )
-def compile(pfs, output, input_dir, editable, debug):
+def compile(pfs, output, input_dir, editable, stable, debug):
     """
     Compiles the Markdown file for the given PFS.
     """
@@ -56,7 +63,7 @@ def compile(pfs, output, input_dir, editable, debug):
         output = "-".join(pfs)
 
     try:
-        compile_(pfs, output, input_dir, editable=editable, debug=debug)
+        compile_(pfs, output, input_dir, editable=editable, stable=stable, debug=debug)
     except Exception as e:
         if debug:
             raise e
@@ -89,6 +96,13 @@ def compile(pfs, output, input_dir, editable, debug):
 @click.option("--pdf", is_flag=True, default=True, help="Enable/disable PDF generation")
 @click.option("--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation")
 @click.option(
+    "--stable",
+    "-s",
+    is_flag=True,
+    default=False,
+    help="Removes the '-draft' suffix from the version number, e.g. 0.1.0-draft becomes 0.1.0",
+)
+@click.option(
     "--id",
     default=None,
     help="Overrides the ID of the document",
@@ -108,7 +122,7 @@ def compile(pfs, output, input_dir, editable, debug):
     default=None,
     help="Overrides the PFS type of the document",
 )
-def generate(pfs, output, input_dir, self_contained, pdf, docx, id, title, version, pfs_type):
+def generate(pfs, output, input_dir, self_contained, pdf, docx, stable, id, title, version, pfs_type):
     """
     Generates the Word and HTML files for the given PFS.
 
@@ -128,7 +142,7 @@ def generate(pfs, output, input_dir, self_contained, pdf, docx, id, title, versi
     }
 
     try:
-        generate_(pfs, output, input_dir, self_contained, pdf, docx, metadata)
+        generate_(pfs, output, input_dir, self_contained, pdf, docx, stable, metadata)
     except Exception as e:
         print(e)
         sys.exit(1)
@@ -162,7 +176,14 @@ def generate(pfs, output, input_dir, self_contained, pdf, docx, id, title, versi
     multiple=True,
     help="PFS to generate, if not specified all PFS will be generated",
 )
-def generate_all(output, input_dir, self_contained, pdf, docx, pfs):
+@click.option(
+    "--stable",
+    "-s",
+    is_flag=True,
+    default=False,
+    help="Removes the '-draft' suffix from the version number, e.g. 0.1.0-draft becomes 0.1.0",
+)
+def generate_all(output, input_dir, self_contained, pdf, docx, pfs, stable):
     """
     Generates all files for all PFS.
 
@@ -171,7 +192,7 @@ def generate_all(output, input_dir, self_contained, pdf, docx, pfs):
     print(f"CEOS-ARD CLI {__version__} - Generate all PFS\n")
     pfs = list(pfs) if pfs is not None else []
     try:
-        errors = generate_all_(output, input_dir, self_contained, pdf, docx, pfs)
+        errors = generate_all_(output, input_dir, self_contained, pdf, docx, pfs, stable)
         print()
         print(f"Done with {errors} errors")
         sys.exit(errors)
