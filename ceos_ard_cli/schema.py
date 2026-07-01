@@ -140,8 +140,8 @@ PFS_DOCUMENT = lambda file, base_path: Map(
         Optional("applies_to", default=""): Markdown(),
         Optional("background", default=""): Markdown(),
         "authors": Markdown() | Seq(Str()),
-        Optional("introduction", default=[]): _RESOLVED_SECTIONS(INTRODUCTION_PATH, base_path),
-        "requirements": Seq(
+        "introduction": _RESOLVED_SECTIONS(INTRODUCTION_PATH, base_path),
+        "requirements": EmptyList() | Seq(
             Map(
                 {
                     "category": Map(
@@ -165,9 +165,9 @@ PFS_DOCUMENT = lambda file, base_path: Map(
                 }
             )
         ),
-        Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
-        Optional("references", default=[]): _REFERENCE_IDS(base_path),
-        Optional("annexes", default=[]): _RESOLVED_SECTIONS(ANNEX_PATH, base_path),
-        Optional("changes", default=[]): _CHANGES,
+        "glossary": _RESOLVED_GLOSSARY(base_path),
+        "references": _REFERENCE_IDS(base_path),
+        "annexes": _RESOLVED_SECTIONS(ANNEX_PATH, base_path),
+        "changes": _CHANGES,
     }
 )
