@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from .schema import REQUIREMENT
+from .utils.deprecation import find_deprecated
 from .utils.files import FILE_CACHE, get_all_files, get_all_folders
 from .utils.pfs import read_pfs
 from .utils.template import read_template
@@ -33,12 +34,16 @@ def validate(input_dir):
     for folder in all_pfs:
         pfs = folder.stem
         error = None
+        deprecated = []
         try:
-            read_pfs(pfs, input_dir)
+            data = read_pfs(pfs, input_dir)
+            deprecated = find_deprecated(data)
         except Exception as e:
             error = e
         finally:
             log(pfs, error)
+            for descriptor in deprecated:
+                print(f"  - WARNING: {descriptor} is deprecated")
 
     # todo: check all files, even if unused
     print("Checking for files not referenced by any PFS (none of them gets validated)")

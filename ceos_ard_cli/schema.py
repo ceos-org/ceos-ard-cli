@@ -81,6 +81,7 @@ GLOSSARY = lambda file, base_path: Map(
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("changes", default=[]): _CHANGES,
         Optional("remarks", default=""): Markdown(),
+        Optional("deprecated", default=False): Bool(),
     }
 )
 _RESOLVED_GLOSSARY = lambda base_path: _RESOLVED_REFS(GLOSSARY_PATH, base_path, GLOSSARY)
@@ -95,6 +96,7 @@ SECTION = lambda file, base_path: Map(
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("changes", default=[]): _CHANGES,
         Optional("remarks", default=""): Markdown(),
+        Optional("deprecated", default=False): Bool(),
     }
 )
 
@@ -122,6 +124,7 @@ REQUIREMENT = lambda file, base_path: Map(
         Optional("changes", default=[]): _CHANGES,
         Optional("remarks", default=""): Markdown(),
         Optional("history", default=[]): EmptyList() | Seq(Str()),
+        Optional("deprecated", default=False): Bool(),
     }
 )
 
@@ -178,5 +181,6 @@ PFS_DOCUMENT = lambda file, base_path: Map(
         "annexes": _RESOLVED_SECTIONS(ANNEX_PATH, base_path),
         "changes": _CHANGES,
         Optional("remarks", default=""): Markdown(),
+        Optional("deprecated", default=False): Bool(),
     }
 )

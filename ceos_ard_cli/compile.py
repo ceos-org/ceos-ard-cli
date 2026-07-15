@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Union
 
 from .schema import REFERENCE_PATH, get_empty_requirement_part
+from .utils.deprecation import find_deprecated
 from .utils.files import fix_path, read_file, write_file
 from .utils.pfs import read_pfs
 from .utils.requirement import slugify
@@ -332,6 +333,8 @@ def compile(
         # resolve ref/replace/append patterns and
         # move the glossary and references to the top level
         multi_pfs[p] = bubble_up(resolve_refs(read_pfs(p, input_dir)))
+        for descriptor in find_deprecated(multi_pfs[p]):
+            print(f"WARNING [{p}]: {descriptor} is deprecated")
 
     if len(pfs) > 1:
         data = combine_pfs(multi_pfs)
