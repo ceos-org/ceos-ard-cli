@@ -78,6 +78,9 @@ GLOSSARY = lambda file, base_path: Map(
         Optional("filepath", default=fix_path(file)): Str(),
         "term": Str(),
         "description": Markdown(),
+        Optional("references", default=[]): _REFERENCE_IDS(base_path),
+        Optional("changes", default=[]): _CHANGES,
+        Optional("remarks", default=""): Markdown(),
     }
 )
 _RESOLVED_GLOSSARY = lambda base_path: _RESOLVED_REFS(GLOSSARY_PATH, base_path, GLOSSARY)
@@ -91,6 +94,7 @@ SECTION = lambda file, base_path: Map(
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("changes", default=[]): _CHANGES,
+        Optional("remarks", default=""): Markdown(),
     }
 )
 
@@ -101,6 +105,7 @@ PARTIAL_SECTION = lambda file, base_path: Map(
         Optional("glossary"): _RESOLVED_GLOSSARY(base_path),
         Optional("references"): _REFERENCE_IDS(base_path),
         Optional("changes"): _CHANGES,
+        Optional("remarks"): Markdown(),
     }
 )
 
@@ -115,6 +120,7 @@ REQUIREMENT = lambda file, base_path: Map(
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("changes", default=[]): _CHANGES,
+        Optional("remarks", default=""): Markdown(),
         Optional("history", default=[]): EmptyList() | Seq(Str()),
     }
 )
@@ -128,6 +134,7 @@ PARTIAL_REQUIREMENT = lambda file, base_path: Map(
         Optional("glossary"): _RESOLVED_GLOSSARY(base_path),
         Optional("references"): _REFERENCE_IDS(base_path),
         Optional("changes"): _CHANGES,
+        Optional("remarks"): Markdown(),
         Optional("history"): Seq(Str()),
     }
 )
@@ -169,5 +176,6 @@ PFS_DOCUMENT = lambda file, base_path: Map(
         "references": _REFERENCE_IDS(base_path),
         "annexes": _RESOLVED_SECTIONS(ANNEX_PATH, base_path),
         "changes": _CHANGES,
+        Optional("remarks", default=""): Markdown(),
     }
 )
