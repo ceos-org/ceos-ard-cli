@@ -148,7 +148,8 @@ PFS_DOCUMENT = lambda file, base_path: Map(
         Optional("background", default=""): Markdown(),
         "authors": Markdown() | Seq(Str()),
         "introduction": _RESOLVED_SECTIONS(INTRODUCTION_PATH, base_path),
-        "requirements": EmptyList() | Seq(
+        "requirements": EmptyList()
+        | Seq(
             Map(
                 {
                     "category": Map(

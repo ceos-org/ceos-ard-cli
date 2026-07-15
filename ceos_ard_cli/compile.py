@@ -180,10 +180,10 @@ def combine_pfs(multi_pfs):
         background = pfs.get("background", "").rstrip()
         if background:
             data["background"][pfs["title"]] = background
-        data["introduction"] = to_id_dict(pfs["introduction"])
-        data["glossary"] = to_id_dict(pfs["glossary"])
+        data["introduction"].update(to_id_dict(pfs["introduction"]))
+        data["glossary"].update(to_id_dict(pfs["glossary"]))
         data["references"].update(pfs["references"])
-        data["annexes"] = to_id_dict(pfs["annexes"])
+        data["annexes"].update(to_id_dict(pfs["annexes"]))
 
         for block in pfs["requirements"]:
             cat_id = block["category"]["id"]
