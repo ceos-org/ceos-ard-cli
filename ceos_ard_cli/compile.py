@@ -260,7 +260,11 @@ def deep_replace(base, overrides):
 
 
 def deep_append(base, additions):
-    """Deep merge where addition values are appended to base values."""
+    """
+    Deep merge where addition values are appended to base values.
+
+    If there's no logical way to append (e.g., boolean values), the addition value replaces the base value.
+    """
     result = base.copy()
     for key, value in additions.items():
         if key not in result:
@@ -403,6 +407,7 @@ def _resolve_dep_path(path, cid, local_requirements, all_requirements, input_dir
         raise ValueError(f"Unmet dependency '{path}' in category '{cid}'")
 
 
+# Note: This function is not used for the append/replace functionality
 def append_requirement(target, req):
     if len(target["description"]) > 0:
         target["description"] += "\n\n" + req["description"]
