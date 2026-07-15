@@ -12,13 +12,16 @@ def read_yaml(file, schema, base_path):
     global YAML_DEPTH
     if YAML_DEPTH > 5:
         return {}
-    YAML_DEPTH += 1
     yaml = read_file(file)
     if not schema:
         raise (ValueError(f"Schema is not provided for {file}"))
-    obj = to_py(strictyaml.load(yaml, schema(file, base_path)))
-    YAML_DEPTH -= 1
-    return obj
+    YAML_DEPTH += 1
+    try:
+        return to_py(strictyaml.load(yaml, schema(file, base_path)))
+    finally:
+        # always restore the depth, even if parsing fails,
+        # so that a failed file doesn't affect subsequent reads
+        YAML_DEPTH -= 1
 
 
 def to_py(data):
