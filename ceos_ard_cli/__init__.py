@@ -93,8 +93,8 @@ def compile(pfs, output, input_dir, editable, stable, debug):
     default=False,
     help="Generate self-contained HTML files",
 )
-@click.option("--pdf", is_flag=True, default=True, help="Enable/disable PDF generation")
-@click.option("--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation")
+@click.option("--pdf", is_flag=True, default=False, help="If provided, disables PDF generation")
+@click.option("--docx", is_flag=True, default=False, help="If provided, disables Word (docx) generation")
 @click.option(
     "--stable",
     "-r",
@@ -168,8 +168,8 @@ def generate(pfs, output, input_dir, self_contained, pdf, docx, stable, id, titl
     default=False,
     help="Generate self-contained HTML files",
 )
-@click.option("--pdf", is_flag=True, default=True, help="Enable/disable PDF generation")
-@click.option("--docx", is_flag=True, default=True, help="Enable/disable Word (docx) generation")
+@click.option("--pdf", is_flag=True, default=False, help="If provided, disables PDF generation")
+@click.option("--docx", is_flag=True, default=False, help="If provided, disables Word (docx) generation")
 @click.option(
     "--pfs",
     "-p",

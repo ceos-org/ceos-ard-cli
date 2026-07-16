@@ -64,7 +64,10 @@ To create the Word, HTML, and PDF versions of a single PFS, run:
 The last part is the PFS to create, e.g. `SR` or `NRB`.
 
 To create a combined PFS, e.g. SAR, the following command can be used:
-`ceos-ard generate NRB POL ORB GSLC -o ../ceos-ard/build/Combined-SAR -i ../ceos-ard --docx --title="Combined Synthetic Aperture Radar" --pfs-type="SAR" --id="SAR"`
+`ceos-ard generate NRB POL ORB GSLC -o ../ceos-ard/build/Combined-SAR -i ../ceos-ard --title="Combined Synthetic Aperture Radar" --pfs-type="SAR" --id="SAR"`
+
+By default, HTML, PDF, and Word documents are generated.
+Pass `--pdf` to skip the PDF output and/or `--docx` to skip the Word output; the HTML version is always generated.
 
 Check `ceos-ard generate --help` (or `ceos-ard generate --help`) for more details.
 
@@ -74,6 +77,8 @@ To create the Word, HTML, and PDF versions for all PFSes, run:
 
 - With Pixi: `ceos-ard generate-all`
 - With traditional setup: `ceos-ard generate-all`
+
+As with `ceos-ard generate`, pass `--pdf` and/or `--docx` to skip the PDF and/or Word outputs.
 
 Check `ceos-ard generate-all --help` (or `ceos-ard generate-all --help`) for more details.
 

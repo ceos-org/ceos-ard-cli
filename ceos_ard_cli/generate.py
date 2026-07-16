@@ -12,8 +12,8 @@ def generate_all(
     output: Union[Path, str],
     input_dir: Union[Path, str],
     self_contained: bool = True,
-    pdf: bool = True,
-    docx: bool = True,
+    no_pdf: bool = False,
+    no_docx: bool = False,
     pfs_list: list = [],
     stable: bool = False,
 ):
@@ -34,8 +34,8 @@ def generate_all(
                     output / pfs,
                     input_dir,
                     self_contained,
-                    pdf,
-                    docx,
+                    no_pdf,
+                    no_docx,
                     stable,
                 )
             except Exception as e:
@@ -50,8 +50,8 @@ def generate(
     output: Union[Path, str],
     input_dir: Union[Path, str],
     self_contained: bool = True,
-    pdf: bool = True,
-    docx: bool = True,
+    no_pdf: bool = False,
+    no_docx: bool = False,
     stable: bool = False,
     metadata: dict = {},
 ):
@@ -61,7 +61,7 @@ def generate(
     input_dir = Path(input_dir).resolve()
     output = Path(output).resolve()
 
-    if docx:
+    if not no_docx:
         print("- Generating editable Markdown")
         target = compile(pfs, output, input_dir, editable=True, stable=stable, metadata=metadata)
 
@@ -74,7 +74,7 @@ def generate(
     print("- Generating HTML")
     run_pandoc(target, "html", input_dir, self_contained)
 
-    if pdf:
+    if not no_pdf:
         print("- Generating PDF")
         run_playwright(target, input_dir)
 
