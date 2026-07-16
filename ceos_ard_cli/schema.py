@@ -30,8 +30,15 @@ _REFS = lambda path, base_path, schema=None, resolve=False: (
 _RESOLVED_REFS = lambda path, base_path, schema: _REFS(path, base_path, schema, resolve=True)
 _RESOLVED_SECTIONS = lambda path, base_path: _RESOLVED_REFS(path, base_path, SECTION)
 _REFERENCE_IDS = lambda base_path: _REFS(REFERENCE_PATH, base_path)
+# A dependency is either a single id or a list of candidate ids,
+# of which the one present in the compiled document is selected.
 _DEPS = lambda path, base_path, schema=None: (
-    EmptyDict() | MapPattern(Str(), IdReference(path, base_path, schema, resolve=False))
+    EmptyDict()
+    | MapPattern(
+        Str(),
+        IdReference(path, base_path, schema, resolve=False)
+        | UniqueSeq(IdReference(path, base_path, schema, resolve=False)),
+    )
 )
 
 _REQUIREMENT_PART = Map(

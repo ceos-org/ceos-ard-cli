@@ -401,13 +401,18 @@ def path_to_id(filepath, input_dir):
 
 
 def _resolve_dep_path(path, cid, local_requirements, all_requirements, input_dir):
-    """Resolve a dependency path to a requirement UID."""
-    if path in local_requirements[cid]:
-        return local_requirements[cid][path]
-    elif path in all_requirements:
-        return all_requirements[path]
-    else:
-        raise ValueError(f"Unmet dependency '{path}' in category '{cid}'")
+    """Resolve a dependency path to a requirement UID.
+
+    The path can be a single path or a list of candidate paths,
+    of which the first one present in the compiled document is selected.
+    """
+    candidates = path if isinstance(path, list) else [path]
+    for candidate in candidates:
+        if candidate in local_requirements[cid]:
+            return local_requirements[cid][candidate]
+        elif candidate in all_requirements:
+            return all_requirements[candidate]
+    raise ValueError(f"Unmet dependency '{' / '.join(candidates)}' in category '{cid}'")
 
 
 # Note: This function is not used for the append/replace functionality
