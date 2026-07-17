@@ -18,6 +18,7 @@ from .utils.files import fix_path
 
 REFERENCE_PATH = "./references/{id}.bib"
 GLOSSARY_PATH = "./glossary/{id}.yaml"
+SECTION_PATH = "./sections/{id}.yaml"
 INTRODUCTION_PATH = "./sections/introduction/{id}.yaml"
 ANNEX_PATH = "./sections/annexes/{id}.yaml"
 REQUIREMENT_CATEGORY_PATH = "./sections/requirement-categories/{id}.yaml"
@@ -40,6 +41,11 @@ _DEPS = lambda path, base_path, schema=None: (
         | UniqueSeq(IdReference(path, base_path, schema, resolve=False)),
     )
 )
+# Dependencies on requirements: alias => requirement path(s)
+_REQUIREMENT_DEPS = lambda base_path: _DEPS(REQUIREMENT_PATH, base_path, REQUIREMENT)
+# Dependencies on sections: alias => section path(s), relative to the sections folder
+# (introduction/..., annexes/..., requirement-categories/...)
+_SECTION_DEPS = lambda base_path: _DEPS(SECTION_PATH, base_path, SECTION)
 
 _REQUIREMENT_PART = Map(
     {
@@ -99,6 +105,8 @@ SECTION = lambda file, base_path: Map(
         Optional("id", default=""): Str(),
         "title": Str(),
         "description": Markdown(),
+        Optional("dependencies", default={}): _REQUIREMENT_DEPS(base_path),
+        Optional("sections", default={}): _SECTION_DEPS(base_path),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("changes", default=[]): _CHANGES,
@@ -111,6 +119,8 @@ PARTIAL_SECTION = lambda file, base_path: Map(
     {
         Optional("title"): Str(),
         Optional("description"): Markdown(),
+        Optional("dependencies"): _REQUIREMENT_DEPS(base_path),
+        Optional("sections"): _SECTION_DEPS(base_path),
         Optional("glossary"): _RESOLVED_GLOSSARY(base_path),
         Optional("references"): _REFERENCE_IDS(base_path),
         Optional("changes"): _CHANGES,
@@ -125,7 +135,8 @@ REQUIREMENT = lambda file, base_path: Map(
         "title": Str(),
         Optional("description", default=""): Markdown(),
         "requirements": MapPattern(Str(), _REQUIREMENT_PART),
-        Optional("dependencies", default={}): _DEPS(REQUIREMENT_PATH, base_path, REQUIREMENT),
+        Optional("dependencies", default={}): _REQUIREMENT_DEPS(base_path),
+        Optional("sections", default={}): _SECTION_DEPS(base_path),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("changes", default=[]): _CHANGES,
@@ -140,7 +151,8 @@ PARTIAL_REQUIREMENT = lambda file, base_path: Map(
         Optional("title"): Str(),
         Optional("description"): Markdown(),
         Optional("requirements"): MapPattern(Str(), _REQUIREMENT_PART_OVERRIDE),
-        Optional("dependencies"): _DEPS(REQUIREMENT_PATH, base_path, REQUIREMENT),
+        Optional("dependencies"): _REQUIREMENT_DEPS(base_path),
+        Optional("sections"): _SECTION_DEPS(base_path),
         Optional("glossary"): _RESOLVED_GLOSSARY(base_path),
         Optional("references"): _REFERENCE_IDS(base_path),
         Optional("changes"): _CHANGES,
@@ -156,6 +168,8 @@ PFS_DOCUMENT = lambda file, base_path: Map(
         "type": Str(),
         Optional("applies_to", default=""): Markdown(),
         Optional("background", default=""): Markdown(),
+        Optional("dependencies", default={}): _REQUIREMENT_DEPS(base_path),
+        Optional("sections", default={}): _SECTION_DEPS(base_path),
         "authors": Markdown() | Seq(Str()),
         "introduction": _RESOLVED_SECTIONS(INTRODUCTION_PATH, base_path),
         "requirements": EmptyList()

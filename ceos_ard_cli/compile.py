@@ -3,11 +3,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Union
 
+from .links import resolve_links
 from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.deprecation import find_deprecated
-from .utils.files import fix_path, read_file, write_file
+from .utils.files import read_file, write_file
 from .utils.pfs import read_pfs
-from .utils.requirement import slugify
 from .utils.template import read_template
 
 
@@ -113,7 +113,8 @@ def topological_sort_requirements(
 
 def unique_merge(existing, additional, key=None):
     if key is None:
-        return list(set(existing + additional))
+        # deduplicate, but preserve the order for deterministic output
+        return list(dict.fromkeys(existing + additional))
     else:
         existing_keys = [e[key] for e in existing]
         for a in additional:
@@ -156,6 +157,8 @@ def combine_pfs(multi_pfs):
         "type": set(),
         "applies_to": {},
         "background": {},
+        "dependencies": {},
+        "sections": {},
         "introduction": {},
         "glossary": {},
         "references": set(),
@@ -181,6 +184,8 @@ def combine_pfs(multi_pfs):
         background = pfs.get("background", "").rstrip()
         if background:
             data["background"][pfs["title"]] = background
+        data["dependencies"].update(pfs.get("dependencies", {}))
+        data["sections"].update(pfs.get("sections", {}))
         data["introduction"].update(to_id_dict(pfs["introduction"]))
         data["glossary"].update(to_id_dict(pfs["glossary"]))
         data["references"].update(pfs["references"])
@@ -225,7 +230,7 @@ def combine_pfs(multi_pfs):
     data["type"] = "Fusion" if len(data["type"]) > 1 else data["type"].pop()
     data["introduction"] = list(data["introduction"].values())
     data["glossary"] = list(data["glossary"].values())
-    data["references"] = list(data["references"])
+    data["references"] = sorted(data["references"])
     data["annexes"] = list(data["annexes"].values())
 
     if len(set(data["applies_to"].values())) == 1:
@@ -387,34 +392,6 @@ def compile_bibtex(data, out, input_dir: Path):
     write_file(out, merged_bibtex)
 
 
-# make uid unique so that it can be used in multiple categories
-def create_uid(block, req_id):
-    return slugify(block["category"]["id"] + "-" + req_id)
-
-
-def path_to_id(filepath, input_dir):
-    req_dir = Path(input_dir) / "requirements"
-    rel_path = fix_path(Path(filepath).relative_to(req_dir))
-    if rel_path.endswith(".yaml"):
-        rel_path = rel_path[:-5]
-    return rel_path
-
-
-def _resolve_dep_path(path, cid, local_requirements, all_requirements, input_dir):
-    """Resolve a dependency path to a requirement UID.
-
-    The path can be a single path or a list of candidate paths,
-    of which the first one present in the compiled document is selected.
-    """
-    candidates = path if isinstance(path, list) else [path]
-    for candidate in candidates:
-        if candidate in local_requirements[cid]:
-            return local_requirements[cid][candidate]
-        elif candidate in all_requirements:
-            return all_requirements[candidate]
-    raise ValueError(f"Unmet dependency '{' / '.join(candidates)}' in category '{cid}'")
-
-
 # Note: This function is not used for the append/replace functionality
 def append_requirement(target, req):
     if len(target["description"]) > 0:
@@ -435,11 +412,6 @@ def compile_markdown(data, out, editable, input_dir: Path):
     context["glossary"] = sorted(context["glossary"], key=lambda x: x["term"].lower())
     # todo: Derive changelogs automatically
 
-    # make a dict of all requirements for efficient dependency lookup
-    all_requirements = {}
-    # make a dict of the requirements in this category for efficient dependency lookup
-    local_requirements = {}
-
     # Merge individual requirements into goal and threshold requirements
     for block in context["requirements"]:
         for idx, req in enumerate(block["requirements"]):
@@ -459,58 +431,13 @@ def compile_markdown(data, out, editable, input_dir: Path):
             req["threshold"] = threshold
             req["goal"] = goal
 
-    # generate uid for each requirement and fill dependency lookups
-    for block in context["requirements"]:
-        cid = block["category"]["id"]
-        local_requirements[cid] = {}
-        for req in block["requirements"]:
-            # make uid unique if it can be used in multiple categories
-            req["uid"] = create_uid(block, req["id"])
-            rel_path = path_to_id(req["filepath"], input_dir)
-            local_requirements[cid][rel_path] = req["uid"]
-            all_requirements[rel_path] = req["uid"]
-
-    # resolve dependencies
-    for block in context["requirements"]:
-        cid = block["category"]["id"]
-        for req in block["requirements"]:
-            resolved_deps = []
-            for alias, path in req["dependencies"].items():
-                ref_id = _resolve_dep_path(path, cid, local_requirements, all_requirements, input_dir)
-                resolved_deps.append(ref_id)
-                update_requirement_references(req, alias, ref_id)
-            req["dependencies"] = resolved_deps
+    # generate requirement uids, resolve the dependencies and sections aliases
+    # and replace the @alias references in the texts with @sec: anchors
+    errors = resolve_links(context, input_dir)
+    if errors:
+        raise ValueError("\n".join(errors))
 
     # read, fill and write the template
     template = read_template(input_dir)
     markdown = template.render(**context)
     write_file(out, markdown)
-
-
-# replace all requirement references in the texts with the resolved references
-def update_requirement_references(req, old_id, new_id):
-    req["description"] = update_requirement_reference(req["description"], old_id, new_id)
-
-    for key in req["requirements"]:
-        update_requirement_part_references(req["requirements"][key], old_id, new_id)
-
-    if req.get("threshold"):
-        update_requirement_part_references(req["threshold"], old_id, new_id)
-    if req.get("goal"):
-        update_requirement_part_references(req["goal"], old_id, new_id)
-
-
-def update_requirement_part_references(part, old_id, new_id):
-    part["description"] = update_requirement_reference(part["description"], old_id, new_id)
-    part["notes"] = update_requirement_reference(part["notes"], old_id, new_id)
-
-
-# replace all requirement references in the given texts with the resolved references
-def update_requirement_reference(req, old_id, new_id):
-    if isinstance(req, list):
-        return [update_requirement_reference(r, old_id, new_id) for r in req]
-    elif isinstance(req, str):
-        # todo: this can probably be improved with a regex to minimmize false positives
-        return req.replace(f"@{old_id}", f"@sec:{new_id}")
-    else:
-        return req

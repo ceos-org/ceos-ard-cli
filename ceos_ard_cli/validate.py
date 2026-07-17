@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from .compile import resolve_refs
+from .links import resolve_links
 from .schema import REQUIREMENT
 from .utils.deprecation import find_deprecated
 from .utils.files import FILE_CACHE, get_all_files, get_all_folders
@@ -35,13 +37,18 @@ def validate(input_dir):
         pfs = folder.stem
         error = None
         deprecated = []
+        link_errors = []
         try:
             data = read_pfs(pfs, input_dir)
             deprecated = find_deprecated(data)
+            # check that all dependencies and sections links can be resolved
+            link_errors = resolve_links(resolve_refs(data), input_dir)
         except Exception as e:
             error = e
         finally:
             log(pfs, error)
+            for message in link_errors:
+                print(f"  - ERROR: {message}")
             for descriptor in deprecated:
                 print(f"  - WARNING: {descriptor} is deprecated")
 
