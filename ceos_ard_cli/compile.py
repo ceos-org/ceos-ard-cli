@@ -1,3 +1,4 @@
+import re
 import shutil
 from collections import defaultdict
 from pathlib import Path
@@ -277,7 +278,12 @@ def deep_append(base, additions):
             result[key] = value
         elif isinstance(result[key], str) and isinstance(value, str):
             if len(result[key]) > 0:
-                result[key] += "\n\n" + value
+                # Append to Markdown lists with a single newline.
+                # Otherwise, use two newlines to create a separate paragraph
+                if re.match(r"^\s*[-*]\s+", value):
+                    result[key] += "\n" + value
+                else:
+                    result[key] += "\n\n" + value
             else:
                 result[key] = value
         elif isinstance(result[key], list) and isinstance(value, list):
