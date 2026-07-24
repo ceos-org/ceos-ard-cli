@@ -338,14 +338,11 @@ def compile(
     input_dir = Path(input_dir).resolve()
     assets_source = input_dir / "assets"
     if assets_source != assets_target:
-        logger = logging.getLogger("dirsync")
+        logger = logging.getLogger("ceos_ard_cli.dirsync")
+        logger.handlers.clear()
         logger.propagate = False
-        if debug:
-            if not logger.handlers:
-                logger.addHandler(logging.StreamHandler())
-            logger.setLevel(logging.INFO)
-        else:
-            logger.addHandler(logging.NullHandler())
+        logger.addHandler(logging.StreamHandler() if debug else logging.NullHandler())
+        logger.setLevel(logging.INFO if debug else logging.CRITICAL)
         sync(str(assets_source), str(assets_target), "sync", create=True, purge=True, content=True, logger=logger)
 
     multi_pfs = {}
