@@ -1,8 +1,10 @@
+import logging
 import re
-import shutil
 from collections import defaultdict
 from pathlib import Path
 from typing import Union
+
+from dirsync import sync
 
 from .links import resolve_links
 from .schema import REFERENCE_PATH, get_empty_requirement_part
@@ -331,12 +333,17 @@ def compile(
     folder = Path(out).parent
     # create folder if needed
     folder.mkdir(parents=True, exist_ok=True)
-    # copy assets if needed
+    # sync assets (copy new/changed files, remove stale ones)
     assets_target = folder / "assets"
     input_dir = Path(input_dir).resolve()
     assets_source = input_dir / "assets"
-    if not assets_target.exists() and assets_source != assets_target:
-        shutil.copytree(assets_source, assets_target)
+    if assets_source != assets_target:
+        logger = logging.getLogger("ceos_ard_cli.dirsync")
+        logger.handlers.clear()
+        logger.propagate = False
+        logger.addHandler(logging.StreamHandler() if debug else logging.NullHandler())
+        logger.setLevel(logging.INFO if debug else logging.CRITICAL)
+        sync(str(assets_source), str(assets_target), "sync", create=True, purge=True, content=True, logger=logger)
 
     multi_pfs = {}
     for p in pfs:
