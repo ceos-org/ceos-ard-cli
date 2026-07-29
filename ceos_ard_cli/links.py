@@ -1,8 +1,16 @@
 import re
 from pathlib import Path
 
-from .utils.files import fix_path
+import strictyaml
+
+from .utils.files import fix_path, read_file
 from .utils.requirement import slugify
+
+# Matches @title:path/to/building-block references in Markdown text.
+# The path is relative to the input directory, without the .yaml extension.
+# The dot is excluded from the allowed characters so that a reference
+# at the end of a sentence doesn't swallow the full stop.
+TITLE_PATTERN = re.compile(r"@title:([A-Za-z0-9_/-]+)")
 
 
 # make uid unique so that it can be used in multiple categories
@@ -116,6 +124,63 @@ def resolve_links(data, input_dir):
     for section in data["introduction"] + data["annexes"]:
         resolve_container(section, None, f"section '{section.get('id') or section.get('title')}'")
     resolve_container(data, None, f"PFS document '{data.get('id') or data.get('title')}'")
+
+    return errors
+
+
+def resolve_titles(data, input_dir):
+    """
+    Replace all @title:... references in the Markdown fields with the title of
+    the referenced building block, read directly from the YAML file on disk.
+
+    Unlike the alias-based links, this is a soft reference: the referenced
+    building block doesn't need to be included in the compiled document,
+    but the file must exist on disk.
+
+    Must run before resolve_links so that the @title: references are gone
+    before the @alias references are rewritten.
+
+    Returns a list of human-readable error messages (empty if everything resolved).
+    """
+    input_dir = Path(input_dir).resolve()
+    errors = []
+    titles = {}
+
+    def load_title(ref):
+        if ref in titles:
+            return titles[ref]
+        title = None
+        file = input_dir / f"{ref}.yaml"
+        if not file.is_file():
+            errors.append(f"Unknown building block '{ref}' in a title reference, expected a file at {file}")
+        else:
+            try:
+                content = strictyaml.load(read_file(file)).data
+            except Exception as e:
+                content = None
+                errors.append(f"Failed to read building block '{ref}' in a title reference: {e}")
+            if isinstance(content, dict):
+                # glossary building blocks use 'term' instead of 'title'
+                title = (content.get("title") or content.get("term") or "").strip()
+            if content is not None and not title:
+                errors.append(f"Building block '{ref}' in a title reference has no title")
+                title = None
+        titles[ref] = title
+        return title
+
+    def replace(value):
+        if isinstance(value, str):
+            # keep the reference as-is on errors, the compilation fails anyway
+            return TITLE_PATTERN.sub(lambda m: load_title(m.group(1)) or m.group(0), value)
+        elif isinstance(value, list):
+            return [replace(v) for v in value]
+        elif isinstance(value, dict):
+            return {k: replace(v) for k, v in value.items()}
+        else:
+            return value
+
+    for key, value in data.items():
+        data[key] = replace(value)
 
     return errors
 

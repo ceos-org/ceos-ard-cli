@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from .compile import resolve_refs
-from .links import resolve_links
+from .links import resolve_links, resolve_titles
 from .schema import REQUIREMENT
 from .utils.deprecation import find_deprecated
 from .utils.files import FILE_CACHE, get_all_files, get_all_folders
@@ -41,8 +41,10 @@ def validate(input_dir):
         try:
             data = read_pfs(pfs, input_dir)
             deprecated = find_deprecated(data)
+            # check that all @title: references point to existing building blocks
+            link_errors = resolve_titles(data, input_dir)
             # check that all dependencies and sections links can be resolved
-            link_errors = resolve_links(resolve_refs(data), input_dir)
+            link_errors += resolve_links(resolve_refs(data), input_dir)
         except Exception as e:
             error = e
         finally:

@@ -6,7 +6,7 @@ from typing import Union
 
 from dirsync import sync
 
-from .links import resolve_links
+from .links import resolve_links, resolve_titles
 from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.deprecation import find_deprecated
 from .utils.files import read_file, write_file
@@ -444,9 +444,13 @@ def compile_markdown(data, out, editable, input_dir: Path):
             req["threshold"] = threshold
             req["goal"] = goal
 
+    # replace the @title: references in the texts with the titles of the
+    # referenced building blocks (soft references, read directly from disk);
+    # must run before resolve_links rewrites the @alias references
+    errors = resolve_titles(context, input_dir)
     # generate requirement uids, resolve the dependencies and sections aliases
     # and replace the @alias references in the texts with @sec: anchors
-    errors = resolve_links(context, input_dir)
+    errors += resolve_links(context, input_dir)
     if errors:
         raise ValueError("\n".join(errors))
 
