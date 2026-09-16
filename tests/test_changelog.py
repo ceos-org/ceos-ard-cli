@@ -386,3 +386,104 @@ class TestBuildChangelog:
         releases = [release("5.0.1", "2026-05-27"), release("7.0.0", "2027-01-01")]
         result = build_changelog(data, releases, {}, tmp_path)
         assert versions(result) == ["6.0.0", "5.0.1"]
+
+
+class TestRows:
+    def test_merges_and_orders_rows(self, tmp_path):
+        req_a = requirement(tmp_path, "metadata/time-st", "time-st", "Time", [change("2026-08-27", "minor", "Second")])
+        req_b = requirement(
+            tmp_path,
+            "per-pixel/cloud-st",
+            "cloud-st",
+            "Cloud",
+            [change("2026-08-27", "major", "Newer"), change("2026-07-31", "minor", "Older")],
+        )
+        term = {
+            "term": "TIR",
+            "filepath": str(tmp_path / "glossary/tir.yaml"),
+            "changes": [change("2026-08-01", "patch")],
+        }
+        term2 = {
+            "term": "LST",
+            "filepath": str(tmp_path / "glossary/lst.yaml"),
+            "changes": [change("2026-08-01", "patch")],
+        }
+        annex = {
+            "id": "examples",
+            "title": "Examples",
+            "filepath": str(tmp_path / "sections/annexes/examples.yaml"),
+            "changes": [change("2026-08-14", "patch")],
+        }
+        intro = {
+            "id": "what",
+            "title": "What",
+            "filepath": str(tmp_path / "sections/introduction/what.yaml"),
+            "changes": [change("2026-08-14", "patch")],
+        }
+        data = pfs_document(
+            tmp_path,
+            "6.0.0",
+            changes=[change("2026-08-14", "major")],
+            requirements=[req_a, req_b],
+            glossary=[term, term2],
+            annexes=[annex],
+        )
+        data["introduction"] = [intro]
+        data["requirements"][0]["category"]["changes"] = [change("2026-08-14", "patch")]
+
+        result = build_changelog(data, [release("5.0.1", "2026-05-27")], {}, tmp_path)
+        rows = result["versions"][0]["rows"]
+        assert [(r["block"]["kind"], r["block"]["title"]) for r in rows] == [
+            ("Document", "Surface Temperature"),
+            ("Introduction", "What"),
+            ("Requirement category", "General Metadata"),
+            ("Annex", "Examples"),
+            ("Requirement", "Time"),
+            ("Requirement", "Cloud"),
+            ("Glossary term", "LST"),
+            ("Glossary term", "TIR"),
+        ]
+        cloud = rows[5]
+        # oldest first, highest level
+        assert [e["change"] for e in cloud["changes"]] == ["Older", "Newer"]
+        assert cloud["level"] == "major"
+        assert rows[4]["level"] == "minor"
+
+    def test_former_members_are_listed_last(self, tmp_path):
+        former = tmp_path / "requirements/per-pixel/aaa.yaml"
+        former.parent.mkdir(parents=True)
+        former.write_text(
+            "id: aaa\ntitle: AAA\nrequirements:\n  threshold:\n    description: Test\nchanges:\n"
+            "  - date: 2026-04-01\n    author: Jane Doe\n    level: minor\n    change: Old change\n    reason: Test\n",
+            encoding="utf-8",
+        )
+        req = requirement(tmp_path, "metadata/zzz", "zzz", "ZZZ", [change("2026-04-02", "minor")])
+        data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-03-26", "patch")], requirements=[req])
+        members = {
+            "5.0.1": {"pfs/ST/document.yaml", "requirements/per-pixel/aaa.yaml", "requirements/metadata/zzz.yaml"}
+        }
+        result = build_changelog(data, [release("5.0.1", "2026-05-27")], members, tmp_path)
+        rows = entries(result, "5.0.1")  # entries still available
+        assert len(rows) == 3
+        titles = [r["block"]["title"] for r in result["versions"][1]["rows"]]
+        assert titles == ["Surface Temperature", "ZZZ", "AAA"]
+
+
+class TestEditors:
+    def test_editors_sorted_by_count(self, tmp_path):
+        req = requirement(
+            tmp_path,
+            "metadata/time-st",
+            "time-st",
+            "Time",
+            [change("2026-08-27", "minor", author="Bob"), change("2026-08-28", "minor", author="Alice")],
+        )
+        data = pfs_document(
+            tmp_path,
+            "6.0.0",
+            changes=[change("2026-08-14", "major", author="Bob"), change("2026-03-26", "patch", author="Carol")],
+            requirements=[req],
+        )
+        result = build_changelog(data, [release("5.0.1", "2026-05-27")], {}, tmp_path)
+        assert result["versions"][0]["editors"] == [{"name": "Bob", "count": 2}, {"name": "Alice", "count": 1}]
+        assert result["versions"][1]["editors"] == [{"name": "Carol", "count": 1}]

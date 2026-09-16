@@ -123,6 +123,11 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
         f"--template=templates/template.{format}",  # template
     ]
 
+    # optional Lua filters, only used if they are provided by the input directory
+    for name in ["changelog-table.lua"]:
+        if (Path(input_dir) / "templates" / name).is_file():
+            cmd += ["-L", f"templates/{name}"]
+
     if format == "html":
         cmd.append("--mathml")
         if self_contained:

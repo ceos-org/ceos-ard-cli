@@ -121,6 +121,8 @@ For each previous release, the PFS document at the release tag is retrieved to o
 If no previous release exists on GitHub, no document history is generated.
 Combined documents never include a document history.
 
+The history is rendered as a table per version with one row per building block (document first, then sections, requirements and glossary terms in document order), listing its changes from the oldest to the newest and the highest change level. As Markdown tables can't contain lists or multiple paragraphs, the template emits the rows as fenced divs and the pandoc Lua filter `templates/changelog-table.lua` from the `ceos-ard` repository converts them into a table. The filter is only loaded if the file exists.
+
 The releases are read from the GitHub repository `ceos-org/ceos-ard`, which can be changed with `--github-repo`.
 A GitHub token can be provided through the `GITHUB_TOKEN` environment variable to avoid rate limits.
 

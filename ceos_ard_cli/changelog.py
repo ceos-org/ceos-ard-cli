@@ -265,7 +265,25 @@ def make_entries(changes, block):
     return entries
 
 
-def make_block(kind, title, filepath, anchor="", direct=True):
+# The groups define the order of the building blocks in the document history:
+# the PFS document first, then the sections, the requirements and the glossary terms
+GROUP_DOCUMENT = 0
+GROUP_SECTION = 1
+GROUP_REQUIREMENT = 2
+GROUP_GLOSSARY = 3
+KIND_GROUPS = {
+    "Document": GROUP_DOCUMENT,
+    "PFS": GROUP_DOCUMENT,
+    "Introduction": GROUP_SECTION,
+    "Requirement category": GROUP_SECTION,
+    "Annex": GROUP_SECTION,
+    "Section": GROUP_SECTION,
+    "Requirement": GROUP_REQUIREMENT,
+    "Glossary term": GROUP_GLOSSARY,
+}
+
+
+def make_block(kind, title, filepath, anchor="", direct=True, order=None):
     return {
         "kind": kind,
         "title": (title or "").strip(),
@@ -274,7 +292,16 @@ def make_block(kind, title, filepath, anchor="", direct=True):
         # direct: the block is referenced directly in the PFS document,
         # so that its membership in a release can be checked
         "direct": direct,
+        # group and order define the position of the block in the document history,
+        # blocks without an order are listed after the ordered blocks of their group
+        "group": KIND_GROUPS.get(kind, GROUP_SECTION),
+        "order": order,
     }
+
+
+def block_sort_key(block):
+    order = block.get("order")
+    return (block.get("group", GROUP_SECTION), order is None, order or 0, block.get("title", "").lower())
 
 
 def collect_changes(data, input_dir, pfs=None):
@@ -286,29 +313,43 @@ def collect_changes(data, input_dir, pfs=None):
     pfs = pfs or data.get("id")
     seen = set()
     entries = []
+    # running counters for the order of the blocks within their groups
+    counters = {}
 
-    def add(container, block):
+    def add(container, block, ordered=True):
         if block["filepath"] in seen:
             return
         seen.add(block["filepath"])
+        if ordered and block["order"] is None:
+            block["order"] = counters.get(block["group"], 0)
+            counters[block["group"]] = block["order"] + 1
         entries.extend(make_entries(container.get("changes"), block))
+
+    def add_section(kind, section, prefix):
+        if section.get("filepath"):
+            add(
+                section,
+                make_block(
+                    kind,
+                    section.get("title"),
+                    relative_filepath(section["filepath"], input_dir),
+                    f"#sec:{prefix}{slugify(section['id'])}" if section.get("id") else "",
+                ),
+            )
 
     # PFS document
     add(data, make_block("Document", data.get("title"), f"pfs/{pfs}/document.yaml"))
 
-    # requirement categories and requirements
+    # sections in document order: introduction, requirement categories, annexes
+    for section in data.get("introduction") or []:
+        add_section("Introduction", section, "intro-")
     for block in data.get("requirements") or []:
-        category = block.get("category") or {}
-        if category.get("filepath"):
-            add(
-                category,
-                make_block(
-                    "Requirement category",
-                    category.get("title"),
-                    relative_filepath(category["filepath"], input_dir),
-                    f"#sec:{category['id']}" if category.get("id") else "",
-                ),
-            )
+        add_section("Requirement category", block.get("category") or {}, "")
+    for section in data.get("annexes") or []:
+        add_section("Annex", section, "annex-")
+
+    # requirements in the order of their first appearance
+    for block in data.get("requirements") or []:
         for req in block.get("requirements") or []:
             if req.get("filepath"):
                 add(
@@ -321,33 +362,21 @@ def collect_changes(data, input_dir, pfs=None):
                     ),
                 )
 
-    # introduction and annexes
-    for kind, key, prefix in (("Introduction", "introduction", "intro-"), ("Annex", "annexes", "annex-")):
-        for section in data.get(key) or []:
-            if section.get("filepath"):
-                add(
-                    section,
-                    make_block(
-                        kind,
-                        section.get("title"),
-                        relative_filepath(section["filepath"], input_dir),
-                        f"#sec:{prefix}{slugify(section['id'])}" if section.get("id") else "",
-                    ),
-                )
-
     # glossary terms (both the ones listed in the PFS document and the ones
-    # referenced by building blocks are bubbled up to the top-level)
-    for term in data.get("glossary") or []:
-        if term.get("filepath"):
-            add(
-                term,
-                make_block(
-                    "Glossary term",
-                    term.get("term"),
-                    relative_filepath(term["filepath"], input_dir),
-                    direct=False,
-                ),
-            )
+    # referenced by building blocks are bubbled up to the top-level), sorted by term
+    terms = [t for t in data.get("glossary") or [] if t.get("filepath")]
+    terms.sort(key=lambda t: (t.get("term") or "").lower())
+    for order, term in enumerate(terms):
+        add(
+            term,
+            make_block(
+                "Glossary term",
+                term.get("term"),
+                relative_filepath(term["filepath"], input_dir),
+                direct=False,
+                order=order,
+            ),
+        )
 
     # any other building block with changes that is nested somewhere in the document
     _collect_nested(data, input_dir, add)
@@ -355,11 +384,46 @@ def collect_changes(data, input_dir, pfs=None):
     return entries
 
 
+def merge_entries(entries):
+    """
+    Merge the entries per building block into rows for the document history table.
+
+    Each row is a dict with the keys `block`, `changes` (sorted from the oldest to
+    the newest) and `level` (the highest level of the changes). The rows are sorted
+    by the position of the building blocks in the document (see `block_sort_key`).
+    """
+    rows = {}
+    for entry in entries:
+        row = rows.setdefault(entry["block"]["filepath"], {"block": entry["block"], "changes": [], "level": None})
+        row["changes"].append(entry)
+    for row in rows.values():
+        row["changes"].sort(key=lambda e: e["date"])
+        row["level"] = highest_level(e["level"] for e in row["changes"])
+    return sorted(rows.values(), key=lambda row: block_sort_key(row["block"]))
+
+
+def collect_editors(entries):
+    """
+    Get the editors (authors) of the given entries, sorted by the number of changes
+    (most changes first, ties alphabetically). Returns a list of dicts with `name` and `count`.
+    """
+    counts = {}
+    for entry in entries:
+        name = entry["author"]
+        if name:
+            counts[name] = counts.get(name, 0) + 1
+    editors = [{"name": name, "count": count} for name, count in counts.items()]
+    editors.sort(key=lambda e: (-e["count"], e["name"].lower()))
+    return editors
+
+
 def _collect_nested(data, input_dir, add):
     if isinstance(data, dict):
         if data.get("filepath") and data.get("changes"):
             kind, name = describe_kind(data)
-            add(data, make_block(kind.capitalize(), name, relative_filepath(data["filepath"], input_dir), direct=False))
+            block = make_block(kind.capitalize(), name, relative_filepath(data["filepath"], input_dir), direct=False)
+            # nested blocks are listed after the ordered blocks of their group
+            add(data, block, ordered=False)
         for value in data.values():
             _collect_nested(value, input_dir, add)
     elif isinstance(data, list):
@@ -492,6 +556,8 @@ def build_changelog(data, releases, members_by_version=None, input_dir=".", pfs=
     kind_order = {"Document": 0}
     for bucket in buckets:
         bucket["entries"].sort(key=lambda e: (e["date"], -kind_order.get(e["block"]["kind"], 1)), reverse=True)
+        bucket["rows"] = merge_entries(bucket["entries"])
+        bucket["editors"] = collect_editors(bucket["entries"])
         bucket["level"] = highest_level(e["level"] for e in bucket["entries"])
         bucket["breaking"] = bucket["level"] == "major"
         bucket["proposed_version"] = None
