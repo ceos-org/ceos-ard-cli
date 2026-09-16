@@ -6,6 +6,7 @@ from typing import Union
 
 from dirsync import sync
 
+from .changelog import DEFAULT_GITHUB_REPO, compile_changelog
 from .links import resolve_links, resolve_titles
 from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.deprecation import find_deprecated
@@ -326,11 +327,14 @@ def compile(
     stable: bool = False,
     metadata: dict = {},
     debug: bool = False,
+    history: bool = False,
+    github_repo: str = DEFAULT_GITHUB_REPO,
 ):
     if isinstance(pfs, str):
         pfs = [pfs]
 
-    folder = Path(out).parent
+    out = Path(out)
+    folder = out.parent
     # create folder if needed
     folder.mkdir(parents=True, exist_ok=True)
     # sync assets (copy new/changed files, remove stale ones)
@@ -383,8 +387,16 @@ def compile(
 
         write_file(f"{out}.debug.json", json.dumps(data, indent=2))
 
-    # create the markfown template
-    compile_markdown(data, f"{out}.md", editable, input_dir)
+    # create the markdown file
+    compile_markdown(
+        data,
+        f"{out}.md",
+        editable,
+        input_dir,
+        history=history,
+        github_repo=github_repo,
+        pfs=pfs[0] if len(pfs) == 1 else None,
+    )
     # write bibtex file to disk
     compile_bibtex(data, f"{out}.bib", input_dir)
 
@@ -415,7 +427,15 @@ def append_requirement(target, req):
     target["metadata"].update(req["metadata"])
 
 
-def compile_markdown(data, out, editable, input_dir: Path):
+def compile_markdown(
+    data,
+    out,
+    editable,
+    input_dir: Path,
+    history: bool = False,
+    github_repo: str = DEFAULT_GITHUB_REPO,
+    pfs: str = None,
+):
     input_dir = Path(input_dir).resolve()
     # create a copy of the data for the template
     context = data.copy()
@@ -423,7 +443,6 @@ def compile_markdown(data, out, editable, input_dir: Path):
     context["editable"] = editable
     # sort glossary
     context["glossary"] = sorted(context["glossary"], key=lambda x: x["term"].lower())
-    # todo: Derive changelogs automatically
 
     # Merge individual requirements into goal and threshold requirements
     for block in context["requirements"]:
@@ -453,6 +472,13 @@ def compile_markdown(data, out, editable, input_dir: Path):
     errors += resolve_links(context, input_dir)
     if errors:
         raise ValueError("\n".join(errors))
+
+    # compile the document history from the changes of all building blocks (opt-in, requires network access);
+    # combined documents never have a document history
+    if history and not context.get("combined"):
+        context["changelog"] = compile_changelog(context, input_dir, pfs or context["id"], github_repo)
+    else:
+        context["changelog"] = None
 
     # read, fill and write the template
     template = read_template(input_dir)

@@ -24,7 +24,8 @@ def _find_deprecated(data, found):
             _find_deprecated(v, found)
 
 
-def describe(data):
+def describe_kind(data):
+    """Determine the kind (e.g. requirement) and name (title) of a building block."""
     if "term" in data:
         kind = "glossary term"
         name = data["term"]
@@ -37,7 +38,11 @@ def describe(data):
     else:
         kind = "section"
         name = data.get("title", data.get("id", ""))
+    return kind, name
 
+
+def describe(data):
+    kind, name = describe_kind(data)
     filepath = data.get("filepath")
     location = f" ({filepath})" if filepath else ""
     return f"{kind} '{name}'{location}"

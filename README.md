@@ -10,6 +10,8 @@ CLI for working with the [CEOS-ARD building blocks and PFSes](https://github.com
   - [`ceos-ard generate`: Create Word/HTML/PDF documents for a single PFS](#ceos-ard-generate-create-wordhtmlpdf-documents-for-a-single-pfs)
   - [`ceos-ard generate-all`: Create Word/HTML/PDF documents for all PFSes](#ceos-ard-generate-all-create-wordhtmlpdf-documents-for-all-pfses)
   - [`ceos-ard validate`: Validate CEOS-ARD components](#ceos-ard-validate-validate-ceos-ard-components)
+  - [`ceos-ard check-changes`: Check for missing changelog entries](#ceos-ard-check-changes-check-for-missing-changelog-entries)
+  - [Document History](#document-history)
 - [Development](#development)
 
 ## Getting Started
@@ -90,6 +92,37 @@ To validate (most of) the building blocks, run:
 - With traditional setup: `ceos-ard validate`
 
 Check `ceos-ard validate --help` (or `ceos-ard validate --help`) for more details.
+
+### `ceos-ard check-changes`: Check for missing changelog entries
+
+To check that all building blocks that have been changed compared to a git branch have a new entry in their `changes`, run:
+
+- With Pixi: `ceos-ard check-changes --base main`
+- With traditional setup: `ceos-ard check-changes --base main`
+
+The working tree is compared against the merge base of the given git ref and `HEAD`.
+Files that only differ in `changes` or `history` don't need a new entry.
+Requires that git is installed. The command exits with a non-zero exit code if entries are missing, so it can be used in CI.
+
+Check `ceos-ard check-changes --help` for more details.
+
+### Document History
+
+By default, the generated documents don't include the document history as compiling it is slow and requires network access.
+Pass `--history` to `ceos-ard compile`, `ceos-ard generate`, or `ceos-ard generate-all` to compile it, e.g. `ceos-ard generate ST --history --stable`.
+
+The document history is compiled from the `changes` of the PFS document and of all building blocks that are used by the PFS.
+The changes are grouped by the GitHub releases of the PFS (tags `<PFS>-v<major>.<minor>.<patch>`) based on their dates:
+a change is listed for the first release that was published on or after the date of the change.
+Newer changes are listed for the upcoming version, together with the next version number that the changes suggest.
+Only the changes back to the previous major version are listed.
+For each previous release, the PFS document at the release tag is retrieved to only list changes of building blocks that were part of the PFS in that version.
+
+If no previous release exists on GitHub, no document history is generated.
+Combined documents never include a document history.
+
+The releases are read from the GitHub repository `ceos-org/ceos-ard`, which can be changed with `--github-repo`.
+A GitHub token can be provided through the `GITHUB_TOKEN` environment variable to avoid rate limits.
 
 ## Development
 

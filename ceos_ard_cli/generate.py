@@ -4,6 +4,7 @@ from typing import Union
 
 from playwright.sync_api import sync_playwright
 
+from .changelog import DEFAULT_GITHUB_REPO
 from .compile import compile
 from .utils.files import read_file
 
@@ -16,6 +17,8 @@ def generate_all(
     no_docx: bool = False,
     pfs_list: list = [],
     stable: bool = False,
+    history: bool = False,
+    github_repo: str = DEFAULT_GITHUB_REPO,
 ):
     # read all folders from the pfs folder
     input_dir = Path(input_dir).resolve()
@@ -37,6 +40,8 @@ def generate_all(
                     no_pdf,
                     no_docx,
                     stable,
+                    history=history,
+                    github_repo=github_repo,
                 )
             except Exception as e:
                 print(f"Error generating {folder}: {e}")
@@ -54,22 +59,25 @@ def generate(
     no_docx: bool = False,
     stable: bool = False,
     metadata: dict = {},
+    history: bool = False,
+    github_repo: str = DEFAULT_GITHUB_REPO,
 ):
     if isinstance(pfs, str):
         pfs = [pfs]
 
     input_dir = Path(input_dir).resolve()
     output = Path(output).resolve()
+    options = {"stable": stable, "metadata": metadata, "history": history, "github_repo": github_repo}
 
     if not no_docx:
         print("- Generating editable Markdown")
-        target = compile(pfs, output, input_dir, editable=True, stable=stable, metadata=metadata)
+        target = compile(pfs, output, input_dir, editable=True, **options)
 
         print("- Generating Word")
         run_pandoc(target, "docx", input_dir, self_contained)
 
     print("- Generating read-only Markdown")
-    target = compile(pfs, output, input_dir, editable=False, stable=stable, metadata=metadata)
+    target = compile(pfs, output, input_dir, editable=False, **options)
 
     print("- Generating HTML")
     run_pandoc(target, "html", input_dir, self_contained)
