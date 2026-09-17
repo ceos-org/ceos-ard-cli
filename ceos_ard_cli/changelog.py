@@ -30,7 +30,7 @@ GITHUB_RAW_URL = "https://raw.githubusercontent.com"
 # ordered from the lowest to the highest level
 LEVELS = ["patch", "minor", "major"]
 
-VERSION_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
+VERSION_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:-draft)?$")
 NEXT_LINK_PATTERN = re.compile(r'<([^>]+)>;\s*rel="next"')
 
 # caches to avoid repeated HTTP requests within a single run

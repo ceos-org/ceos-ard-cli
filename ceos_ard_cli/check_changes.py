@@ -66,6 +66,9 @@ def changed_files(input_dir, base):
     input_dir = Path(input_dir).resolve()
     merge_base = run_git(["merge-base", base, "HEAD"], input_dir).strip()
     output = run_git(["diff", "--name-status", "--relative", "--diff-filter=AMRC", merge_base], input_dir)
+    untracked = run_git(["ls-files", "--others", "--exclude-standard"], input_dir)
+    if untracked:
+        output += "".join(f"A\t{path}\n" for path in untracked.splitlines())
     files = []
     for line in output.splitlines():
         parts = line.rstrip("\n").split("\t")
