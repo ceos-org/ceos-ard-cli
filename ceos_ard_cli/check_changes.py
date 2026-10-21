@@ -1,13 +1,8 @@
-"""
-Check that all building blocks that have been changed (compared to a git base ref)
-have a new entry in their `changes` list.
-"""
-
 import re
-import subprocess
 from pathlib import Path
 
 from .changelog import parse_yaml
+from .utils.git import run_git
 
 BLOCK_PATTERN = re.compile(r"^(requirements|sections|glossary)/.+\.yaml$")
 PFS_PATTERN = re.compile(r"^pfs/[^/]+/document\.yaml$")
@@ -16,15 +11,7 @@ TEMPLATE_FILENAME = "_template.yaml"
 IGNORED_KEYS = ("changes", "history")
 
 
-def run_git(args, cwd):
-    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8")
-    if result.returncode != 0:
-        raise ValueError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
-    return result.stdout
-
-
 def is_building_block(path):
-    """Check whether the (input directory relative) path is a building block or PFS document that must have changes."""
     path = str(path).replace("\\", "/")
     if Path(path).name == TEMPLATE_FILENAME:
         return False
@@ -41,11 +28,6 @@ def count_changes(data):
 
 
 def check_file(old_text, new_text):
-    """
-    Compare the old and new content of a building block.
-
-    Returns an error message, or None if the file is fine.
-    """
     old = parse_yaml(old_text) if old_text.strip() else {}
     new = parse_yaml(new_text) if new_text.strip() else {}
     if strip_ignored(old) == strip_ignored(new):
@@ -57,12 +39,6 @@ def check_file(old_text, new_text):
 
 
 def changed_files(input_dir, base):
-    """
-    List the files (relative to the input directory) that were added, modified or renamed
-    in the working tree compared to the merge base of the given git ref and HEAD.
-
-    Returns a list of tuples (path, old_path), where old_path is None for added files.
-    """
     input_dir = Path(input_dir).resolve()
     merge_base = run_git(["merge-base", base, "HEAD"], input_dir).strip()
     output = run_git(["diff", "--name-status", "--relative", "--diff-filter=AMRC", merge_base], input_dir)
@@ -85,12 +61,6 @@ def changed_files(input_dir, base):
 
 
 def check_changes(input_dir, base):
-    """
-    Check all changed building blocks for new changelog entries.
-
-    Returns a tuple (errors, checked), with a list of human-readable error messages
-    and the number of files that were checked.
-    """
     input_dir = Path(input_dir).resolve()
     merge_base, files = changed_files(input_dir, base)
     errors = []

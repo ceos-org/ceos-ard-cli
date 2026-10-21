@@ -108,15 +108,23 @@ Check `ceos-ard check-changes --help` for more details.
 
 ### Document History
 
-By default, the generated documents don't include the document history as compiling it is slow and requires network access.
+By default, the generated documents don't include the document history as compiling it requires the git history and network access.
 Pass `--history` to `ceos-ard compile`, `ceos-ard generate`, or `ceos-ard generate-all` to compile it, e.g. `ceos-ard generate ST --history --stable`.
+The input directory must be a git checkout with the full history and the release tags (e.g. `fetch-depth: 0` for `actions/checkout`, or `git fetch --tags` locally).
 
 The document history is compiled from the `changes` of the PFS document and of all building blocks that are used by the PFS.
-The changes are grouped by the GitHub releases of the PFS (tags `<PFS>-v<major>.<minor>.<patch>`) based on their dates:
-a change is listed for the first release that was published on or after the date of the change.
-Newer changes are listed for the upcoming version, together with the next version number that the changes suggest.
+The changes are grouped by the GitHub releases of the PFS (tags `<PFS>-v<major>.<minor>.<patch>`).
+As releases are always created from main, a change is part of a release if the commit that merged it into main
+(the first commit in the first-parent history of `HEAD` that contains the change) is an ancestor of the release tag.
+Edited changes and changes in renamed files keep their original commit.
+Changes that are not part of a release are listed for the draft version, together with the next version number that the changes suggest.
+This also applies if the version of the PFS document has been released already.
 Only the changes back to the previous major version are listed.
-For each previous release, the PFS document at the release tag is retrieved to only list changes of building blocks that were part of the PFS in that version.
+For each of these releases, only the changes of building blocks that were part of the PFS in that release are listed,
+including the glossary terms that were referenced by them and following renamed files.
+Building blocks that have been deleted since are read from the release tag.
+
+If `HEAD` has a release tag for the PFS, its version must match the version of the PFS document.
 
 If no previous release exists on GitHub, no document history is generated.
 Combined documents never include a document history.

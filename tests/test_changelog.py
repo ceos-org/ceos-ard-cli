@@ -1,14 +1,20 @@
 """Tests for the document history (changelog) generation."""
 
+import os
+import re
+import shutil
+import subprocess
 from datetime import date
 
 import pytest
 
 from ceos_ard_cli import changelog
 from ceos_ard_cli.changelog import (
+    GitHistory,
     build_changelog,
     bump_version,
     collect_changes,
+    compile_changelog,
     fetch_releases,
     highest_level,
     members_from_document,
@@ -28,6 +34,35 @@ def release(version, day, pfs="ST"):
         "tag": f"{pfs}-v{version}",
         "url": f"https://github.com/ceos-org/ceos-ard/releases/tag/{pfs}-v{version}",
     }
+
+
+VALID_DATE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")
+
+
+class FakeHistory:
+    """Assigns the changes to the releases by their dates, the members are given per release tag."""
+
+    def __init__(self, releases=(), members=None, files=None):
+        self.dates = {r["tag"]: r["date"] for r in releases}
+        self._members = members or {}
+        self.files = files or {}
+
+    def merge_commits(self, filepath, changes):
+        # invalid dates are reported by the changelog itself
+        return [date.fromisoformat(str(c["date"])) if VALID_DATE.match(str(c["date"])) else None for c in changes]
+
+    def contains(self, tag, commit):
+        return commit is not None and commit <= self.dates[tag]
+
+    def members(self, tag, pfs):
+        return self._members.get(tag)
+
+    def read_file(self, tag, path):
+        return self.files.get(path)
+
+
+def build(data, releases, input_dir, members=None, files=None):
+    return build_changelog(data, releases, FakeHistory(releases, members, files), input_dir)
 
 
 def requirement(input_dir, rel_path, req_id, title, changes=(), uid=None):
@@ -68,11 +103,35 @@ def versions(result):
     return [v["version"] for v in result["versions"]]
 
 
-def entries(result, version):
+def entries(result, version, released=None):
     for v in result["versions"]:
-        if v["version"] == version:
+        if v["version"] == version and (released is None or v["released"] == released):
             return v["entries"]
     raise KeyError(version)
+
+
+def changes_of(result, version, released=None):
+    return sorted(e["change"] for e in entries(result, version, released))
+
+
+SNOW_ICE = (
+    "id: snow-ice-sr\n"
+    "title: Snow/Ice\n"
+    "requirements:\n"
+    "  threshold:\n"
+    "    description: Test\n"
+    "changes:\n"
+    "  - date: 2026-04-01\n"
+    "    author: Jane Doe\n"
+    "    level: minor\n"
+    "    change: Old change\n"
+    "    reason: Test\n"
+    "  - date: 2026-08-01\n"
+    "    author: Jane Doe\n"
+    "    level: major\n"
+    "    change: Change for another PFS\n"
+    "    reason: Test\n"
+)
 
 
 class TestVersions:
@@ -86,6 +145,8 @@ class TestVersions:
             parse_version("v6.0.0")
         with pytest.raises(ValueError):
             parse_version("6.0")
+        with pytest.raises(ValueError):
+            parse_version("6.0.0junk")
 
     def test_bump_version(self):
         assert bump_version((5, 0, 1), "major") == (6, 0, 0)
@@ -142,7 +203,10 @@ class TestMembers:
             "requirements": [
                 {
                     "category": "general-metadata",
-                    "requirements": ["metadata/time-st", {"ref": "metadata/crs-ar", "replace": {}}],
+                    "requirements": [
+                        "metadata/time-st",
+                        {"ref": "metadata/crs-ar", "append": {"glossary": ["crs"]}},
+                    ],
                 },
                 {"category": {"ref": "per-pixel-metadata"}, "requirements": ["per-pixel/nodata-st"]},
             ],
@@ -151,6 +215,7 @@ class TestMembers:
             "pfs/ST/document.yaml",
             "sections/introduction/what-are-ceos-ard-products.yaml",
             "glossary/st.yaml",
+            "glossary/crs.yaml",
             "sections/requirement-categories/general-metadata.yaml",
             "sections/requirement-categories/per-pixel-metadata.yaml",
             "requirements/metadata/time-st.yaml",
@@ -181,7 +246,7 @@ class TestCollectChanges:
             glossary=[term],
             annexes=[annex],
         )
-        result = collect_changes(data, tmp_path)
+        result = collect_changes(data, tmp_path, FakeHistory())
         by_path = {e["block"]["filepath"]: e for e in result}
         assert set(by_path) == {
             "pfs/ST/document.yaml",
@@ -194,8 +259,6 @@ class TestCollectChanges:
         assert doc["date"] == date(2026, 8, 14)
         assert doc["level"] == "major"
         assert by_path["requirements/metadata/time-st.yaml"]["block"]["anchor"] == "#sec:general-metadata-time-st"
-        assert by_path["requirements/metadata/time-st.yaml"]["block"]["direct"] is True
-        assert by_path["glossary/st.yaml"]["block"]["direct"] is False
         assert (
             by_path["sections/annexes/st-metadata-examples.yaml"]["block"]["anchor"]
             == "#sec:annex-st-metadata-examples"
@@ -204,28 +267,28 @@ class TestCollectChanges:
     def test_invalid_date(self, tmp_path):
         data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-13-01", "major")])
         with pytest.raises(ValueError, match="2026-13-01"):
-            collect_changes(data, tmp_path)
+            collect_changes(data, tmp_path, FakeHistory())
 
 
 class TestBuildChangelog:
     def test_no_previous_release_first_version(self, tmp_path):
         data = pfs_document(tmp_path, "1.0.0", changes=[change("2026-08-14", "major")])
-        result = build_changelog(data, [], {}, tmp_path)
+        result = build(data, [], tmp_path)
         assert result["versions"] == []
         assert result["first_release"] is True
 
         # the release of the current version itself is not a previous release
-        result = build_changelog(data, [release("1.0.0", "2026-09-01")], {}, tmp_path)
+        result = build(data, [release("1.0.0", "2026-09-01")], tmp_path)
         assert result["versions"] == []
         assert result["first_release"] is True
 
     def test_no_previous_release_higher_version(self, tmp_path):
         data = pfs_document(tmp_path, "1.1.0", changes=[change("2026-08-14", "minor")])
-        result = build_changelog(data, [], {}, tmp_path)
+        result = build(data, [], tmp_path)
         assert result["versions"] == []
         assert result["first_release"] is False
 
-    def test_buckets_by_release_date(self, tmp_path, capsys):
+    def test_buckets_by_release(self, tmp_path, capsys):
         req = requirement(tmp_path, "per-pixel/surface-st", "surface-st", "Surface", [change("2026-07-31", "major")])
         data = pfs_document(
             tmp_path,
@@ -233,7 +296,7 @@ class TestBuildChangelog:
             changes=[change("2026-08-14", "major", "Big update"), change("2026-03-26", "patch", "Migration")],
             requirements=[req],
         )
-        result = build_changelog(data, [release("5.0.1", "2026-05-27")], {}, tmp_path)
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path)
 
         assert versions(result) == ["6.0.0-draft", "5.0.1"]
         assert result["latest_release"] == "5.0.1"
@@ -245,20 +308,14 @@ class TestBuildChangelog:
         assert draft["released"] is False
         assert draft["date"] is None
         assert draft["level"] == "major"
-        assert draft["breaking"] is True
         assert draft["proposed_version"] == "6.0.0"
         assert draft["proposed_level"] == "major"
-        # newest first, the document entry comes first on the same date
-        assert [(str(e["date"]), e["block"]["kind"]) for e in draft["entries"]] == [
-            ("2026-08-14", "Document"),
-            ("2026-07-31", "Requirement"),
-        ]
+        assert [r["block"]["kind"] for r in draft["rows"]] == ["Document", "Requirement"]
 
         old = result["versions"][1]
         assert old["released"] is True
         assert old["date"] == date(2026, 5, 27)
         assert old["level"] == "patch"
-        assert old["breaking"] is False
         assert old["proposed_version"] is None
         assert [e["change"] for e in old["entries"]] == ["Migration"]
 
@@ -266,7 +323,7 @@ class TestBuildChangelog:
 
     def test_proposed_version_mismatch_warning(self, tmp_path, capsys):
         data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-08-14", "patch")])
-        result = build_changelog(data, [release("5.0.1", "2026-05-27")], {}, tmp_path)
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path)
         draft = result["versions"][0]
         assert draft["proposed_version"] == "5.0.2"
         assert draft["proposed_level"] == "patch"
@@ -277,7 +334,7 @@ class TestBuildChangelog:
 
     def test_no_unreleased_changes(self, tmp_path):
         data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-03-26", "patch")])
-        result = build_changelog(data, [release("5.0.1", "2026-05-27")], {}, tmp_path)
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path)
         draft = result["versions"][0]
         assert draft["entries"] == []
         assert draft["level"] is None
@@ -294,7 +351,7 @@ class TestBuildChangelog:
             release("4.0.0", "2025-02-01"),
             release("5.0.1", "2026-05-27"),
         ]
-        result = build_changelog(data, releases, {}, tmp_path)
+        result = build(data, releases, tmp_path)
         # 6.x lists the changes back to 5.0.0 only
         assert versions(result) == ["6.0.0", "5.0.1"]
         assert result["truncated"] is True
@@ -303,19 +360,23 @@ class TestBuildChangelog:
         assert entries(result, "5.0.1") == []
 
     def test_membership_filter(self, tmp_path):
-        # the requirement was changed before the 5.0.1 release, but only added to the PFS afterwards
+        # the requirement and the glossary term were changed before the 5.0.1 release, but only added afterwards
         req = requirement(tmp_path, "metadata/crs-ar", "crs-ar", "CRS", [change("2026-04-13", "minor")])
-        # glossary terms can't be checked, they are always kept
         term = {
+            "term": "CRS",
+            "filepath": str(tmp_path / "glossary/crs.yaml"),
+            "changes": [change("2026-04-01", "patch")],
+        }
+        term2 = {
             "term": "ST",
             "filepath": str(tmp_path / "glossary/st.yaml"),
             "changes": [change("2026-04-01", "patch")],
         }
         data = pfs_document(
-            tmp_path, "6.0.0", changes=[change("2026-03-26", "patch")], requirements=[req], glossary=[term]
+            tmp_path, "6.0.0", changes=[change("2026-03-26", "patch")], requirements=[req], glossary=[term, term2]
         )
-        members = {"5.0.1": {"pfs/ST/document.yaml", "requirements/metadata/time-st.yaml"}}
-        result = build_changelog(data, [release("5.0.1", "2026-05-27")], members, tmp_path)
+        members = {"ST-v5.0.1": {"pfs/ST/document.yaml", "requirements/metadata/time-st.yaml", "glossary/st.yaml"}}
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path, members)
         old = entries(result, "5.0.1")
         assert {e["block"]["filepath"] for e in old} == {"pfs/ST/document.yaml", "glossary/st.yaml"}
 
@@ -323,68 +384,64 @@ class TestBuildChangelog:
         req = requirement(tmp_path, "metadata/crs-ar", "crs-ar", "CRS", [change("2026-04-13", "minor")])
         data = pfs_document(tmp_path, "6.0.0", requirements=[req])
         # None means the membership could not be determined
-        result = build_changelog(data, [release("5.0.1", "2026-05-27")], {"5.0.1": None}, tmp_path)
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path, {"ST-v5.0.1": None})
         assert len(entries(result, "5.0.1")) == 1
 
     def test_former_member(self, tmp_path):
         # a requirement that was part of 5.0.1 but has been removed since
         former = tmp_path / "requirements/per-pixel/snow-ice-sr.yaml"
         former.parent.mkdir(parents=True)
-        former.write_text(
-            "id: snow-ice-sr\n"
-            "title: Snow/Ice\n"
-            "requirements:\n"
-            "  threshold:\n"
-            "    description: Test\n"
-            "changes:\n"
-            "  - date: 2026-04-01\n"
-            "    author: Jane Doe\n"
-            "    level: minor\n"
-            "    change: Old change\n"
-            "    reason: Test\n"
-            "  - date: 2026-08-01\n"
-            "    author: Jane Doe\n"
-            "    level: major\n"
-            "    change: Change for another PFS\n"
-            "    reason: Test\n",
-            encoding="utf-8",
-        )
+        former.write_text(SNOW_ICE, encoding="utf-8")
         data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-08-14", "major")])
-        members = {"5.0.1": {"pfs/ST/document.yaml", "requirements/per-pixel/snow-ice-sr.yaml"}}
-        result = build_changelog(data, [release("5.0.1", "2026-05-27")], members, tmp_path)
+        members = {"ST-v5.0.1": {"pfs/ST/document.yaml", "requirements/per-pixel/snow-ice-sr.yaml"}}
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path, members)
 
         old = entries(result, "5.0.1")
         assert [(e["change"], e["block"]["kind"], e["block"]["title"]) for e in old] == [
             ("Old change", "Requirement", "Snow/Ice")
         ]
         # the newer change is not part of the current PFS anymore
-        assert [e["change"] for e in entries(result, "6.0.0")] != ["Change for another PFS"]
         assert all(
             e["block"]["filepath"] != "requirements/per-pixel/snow-ice-sr.yaml" for e in entries(result, "6.0.0")
         )
 
-    def test_deleted_former_member_is_skipped(self, tmp_path):
+    def test_deleted_former_member_is_read_from_the_release(self, tmp_path):
         data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-08-14", "major")])
-        members = {"5.0.1": {"pfs/ST/document.yaml", "requirements/gone.yaml"}}
-        result = build_changelog(data, [release("5.0.1", "2026-05-27")], members, tmp_path)
-        assert entries(result, "5.0.1") == []
+        members = {"ST-v5.0.1": {"pfs/ST/document.yaml", "requirements/per-pixel/snow-ice-sr.yaml"}}
+        files = {"requirements/per-pixel/snow-ice-sr.yaml": SNOW_ICE}
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path, members, files)
+        assert [e["change"] for e in entries(result, "5.0.1")] == ["Old change"]
 
-    def test_change_dated_after_released_current_version(self, tmp_path, capsys):
-        data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-09-10", "patch")])
+    def test_changes_after_the_release_of_the_current_version(self, tmp_path, capsys):
+        data = pfs_document(
+            tmp_path,
+            "6.0.0-draft",
+            changes=[change("2026-08-01", "major", "Big"), change("2026-09-10", "patch", "Fix")],
+        )
         releases = [release("5.0.1", "2026-05-27"), release("6.0.0", "2026-09-01")]
-        result = build_changelog(data, releases, {}, tmp_path)
-        assert versions(result) == ["6.0.0", "5.0.1"]
-        current = result["versions"][0]
+        result = build(data, releases, tmp_path)
+        assert versions(result) == ["6.0.0-draft", "6.0.0", "5.0.1"]
+        draft, current = result["versions"][:2]
+        assert draft["released"] is False
+        assert [e["change"] for e in draft["entries"]] == ["Fix"]
+        assert draft["proposed_version"] == "6.0.1"
         assert current["released"] is True
         assert current["date"] == date(2026, 9, 1)
-        assert len(current["entries"]) == 1
-        assert current["proposed_version"] is None
-        assert "is dated 2026-09-10" in capsys.readouterr().out
+        assert [e["change"] for e in current["entries"]] == ["Big"]
+        assert "suggest version 6.0.1 (patch)" in capsys.readouterr().out
+
+    def test_released_current_version_without_newer_changes(self, tmp_path, capsys):
+        data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-08-01", "major")])
+        releases = [release("5.0.1", "2026-05-27"), release("6.0.0", "2026-09-01")]
+        result = build(data, releases, tmp_path)
+        assert versions(result) == ["6.0.0", "5.0.1"]
+        assert result["versions"][0]["released"] is True
+        assert "WARNING" not in capsys.readouterr().out
 
     def test_releases_newer_than_current_are_ignored(self, tmp_path):
         data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-08-14", "major")])
         releases = [release("5.0.1", "2026-05-27"), release("7.0.0", "2027-01-01")]
-        result = build_changelog(data, releases, {}, tmp_path)
+        result = build(data, releases, tmp_path)
         assert versions(result) == ["6.0.0", "5.0.1"]
 
 
@@ -431,7 +488,7 @@ class TestRows:
         data["introduction"] = [intro]
         data["requirements"][0]["category"]["changes"] = [change("2026-08-14", "patch")]
 
-        result = build_changelog(data, [release("5.0.1", "2026-05-27")], {}, tmp_path)
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path)
         rows = result["versions"][0]["rows"]
         assert [(r["block"]["kind"], r["block"]["title"]) for r in rows] == [
             ("Document", "Surface Temperature"),
@@ -460,11 +517,10 @@ class TestRows:
         req = requirement(tmp_path, "metadata/zzz", "zzz", "ZZZ", [change("2026-04-02", "minor")])
         data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-03-26", "patch")], requirements=[req])
         members = {
-            "5.0.1": {"pfs/ST/document.yaml", "requirements/per-pixel/aaa.yaml", "requirements/metadata/zzz.yaml"}
+            "ST-v5.0.1": {"pfs/ST/document.yaml", "requirements/per-pixel/aaa.yaml", "requirements/metadata/zzz.yaml"}
         }
-        result = build_changelog(data, [release("5.0.1", "2026-05-27")], members, tmp_path)
-        rows = entries(result, "5.0.1")  # entries still available
-        assert len(rows) == 3
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path, members)
+        assert len(entries(result, "5.0.1")) == 3
         titles = [r["block"]["title"] for r in result["versions"][1]["rows"]]
         assert titles == ["Surface Temperature", "ZZZ", "AAA"]
 
@@ -484,6 +540,147 @@ class TestEditors:
             changes=[change("2026-08-14", "major", author="Bob"), change("2026-03-26", "patch", author="Carol")],
             requirements=[req],
         )
-        result = build_changelog(data, [release("5.0.1", "2026-05-27")], {}, tmp_path)
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path)
         assert result["versions"][0]["editors"] == [{"name": "Bob", "count": 2}, {"name": "Alice", "count": 1}]
         assert result["versions"][1]["editors"] == [{"name": "Carol", "count": 1}]
+
+
+GIT_ENV = {
+    **os.environ,
+    "GIT_AUTHOR_NAME": "Test",
+    "GIT_AUTHOR_EMAIL": "test@example.com",
+    "GIT_COMMITTER_NAME": "Test",
+    "GIT_COMMITTER_EMAIL": "test@example.com",
+}
+
+
+def git(cwd, *args):
+    subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, env=GIT_ENV)
+
+
+def change_yaml(day, text, level="minor"):
+    return f"  - date: {day}\n    author: Jane Doe\n    level: {level}\n    change: {text}\n    reason: Test\n"
+
+
+def write(path, content):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def write_requirement(path, *changes, glossary=()):
+    terms = "".join(f"  - {term}\n" for term in glossary)
+    write(
+        path,
+        f"id: {path.stem}\ntitle: {path.stem.upper()}\nrequirements:\n  threshold:\n    description: Test\n"
+        + (f"glossary:\n{terms}" if terms else "")
+        + f"changes:\n{''.join(changes)}history:\n  - SR 1.2\n",
+    )
+
+
+def write_document(path, version, requirements):
+    reqs = "".join(f"      - {req}\n" for req in requirements)
+    write(
+        path,
+        f"title: Surface Temperature\nversion: {version}\ntype: Optical\nauthors: []\nintroduction: []\n"
+        f"requirements:\n  - category: general-metadata\n    requirements:\n{reqs}"
+        "glossary: []\nreferences: []\nannexes: []\nchanges: []\n",
+    )
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
+class TestGitHistory:
+    A = change_yaml("2026-04-30", "Change A")
+    B = change_yaml("2026-05-15", "Change B")
+
+    @pytest.fixture
+    def repo(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(changelog, "_HISTORY_CACHE", {})
+        git(tmp_path, "init", "-q", "-b", "main")
+        write_requirement(tmp_path / "requirements/a.yaml", self.A, glossary=["lst"])
+        write_requirement(tmp_path / "requirements/gone.yaml", change_yaml("2026-04-30", "Change G"))
+        write_document(tmp_path / "pfs/ST/document.yaml", "5.0.1", ["a", "gone"])
+        git(tmp_path, "add", "-A")
+        git(tmp_path, "commit", "-q", "-m", "A")
+
+        # written before the release, but merged afterwards
+        git(tmp_path, "checkout", "-q", "-b", "feature")
+        write_requirement(tmp_path / "requirements/a.yaml", self.A, self.B, glossary=["lst"])
+        git(tmp_path, "commit", "-q", "-am", "B")
+        git(tmp_path, "checkout", "-q", "main")
+        git(tmp_path, "tag", "ST-v5.0.1")
+        git(tmp_path, "merge", "-q", "--no-ff", "-m", "Merge", "feature")
+
+        # renaming a file, fixing a typo in a change and deleting a file
+        git(tmp_path, "mv", "requirements/a.yaml", "requirements/x.yaml")
+        git(tmp_path, "rm", "-q", "requirements/gone.yaml")
+        write_document(tmp_path / "pfs/ST/document.yaml", "6.0.0", ["x"])
+        git(tmp_path, "commit", "-q", "-am", "Rename")
+        write_requirement(
+            tmp_path / "requirements/x.yaml", change_yaml("2026-04-30", "Change A, fixed"), self.B, glossary=["lst"]
+        )
+        git(tmp_path, "commit", "-q", "-am", "Typo")
+        return tmp_path
+
+    def released(self, history, filepath, changes):
+        return [history.contains("ST-v5.0.1", c) for c in history.merge_commits(filepath, changes)]
+
+    def test_merge_commits(self, repo):
+        history = GitHistory(repo)
+        current = [
+            change("2026-04-30", "minor", "Change A, fixed", "Test"),
+            change("2026-05-15", "minor", "Change B", "Test"),
+            change("2026-06-20", "minor", "Not committed", "Test"),
+        ]
+        assert self.released(history, "requirements/x.yaml", current) == [True, False, False]
+        assert history.merge_commits("requirements/x.yaml", current)[2] is None
+        assert history.merge_commits("requirements/new.yaml", current[2:]) == [None]
+
+    def test_members(self, repo):
+        history = GitHistory(repo)
+        assert history.members("ST-v5.0.1", "ST") == {
+            "pfs/ST/document.yaml",
+            "sections/requirement-categories/general-metadata.yaml",
+            "requirements/x.yaml",
+            "requirements/gone.yaml",
+            "glossary/lst.yaml",
+        }
+        assert "Change G" in history.read_file("ST-v5.0.1", "requirements/gone.yaml")
+        assert history.members("ST-v5.0.1", "SR") is None
+
+    def test_missing_tag(self, repo):
+        history = GitHistory(repo)
+        with pytest.raises(ValueError, match="git fetch --tags"):
+            history.contains("ST-v9.9.9", "abc")
+
+    def test_head_tag_must_match_version(self, repo, monkeypatch):
+        monkeypatch.setattr(changelog, "fetch_releases", lambda repo, pfs: [release("5.0.1", "2026-05-27")])
+        git(repo, "tag", "ST-v6.0.1")
+        with pytest.raises(ValueError, match="ST-v6.0.1 doesn't match the version 6.0.0"):
+            compile_changelog(pfs_document(repo, "6.0.0"), repo, "ST")
+
+    def test_compile_changelog(self, repo, monkeypatch):
+        monkeypatch.setattr(changelog, "fetch_releases", lambda repo, pfs: [release("5.0.1", "2026-05-27")])
+        req = requirement(
+            repo,
+            "x",
+            "x",
+            "X",
+            [
+                change("2026-04-30", "minor", "Change A, fixed", "Test"),
+                change("2026-05-15", "minor", "Change B", "Test"),
+            ],
+        )
+        data = pfs_document(repo, "6.0.0-draft", requirements=[req])
+        result = compile_changelog(data, repo, "ST")
+        assert changes_of(result, "6.0.0-draft") == ["Change B"]
+        assert changes_of(result, "5.0.1") == ["Change A, fixed", "Change G"]
+
+    def test_shallow_clone(self, repo, tmp_path_factory):
+        clone = tmp_path_factory.mktemp("clone")
+        git(clone, "clone", "-q", "--depth", "1", repo.as_uri(), ".")
+        with pytest.raises(ValueError, match="fetch-depth"):
+            GitHistory(clone)
+
+    def test_not_a_repository(self, tmp_path_factory):
+        with pytest.raises(ValueError, match="git checkout"):
+            GitHistory(tmp_path_factory.mktemp("plain"))

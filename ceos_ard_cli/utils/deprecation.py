@@ -25,7 +25,6 @@ def _find_deprecated(data, found):
 
 
 def describe_kind(data):
-    """Determine the kind (e.g. requirement) and name (title) of a building block."""
     if "term" in data:
         kind = "glossary term"
         name = data["term"]

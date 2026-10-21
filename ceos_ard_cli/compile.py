@@ -473,7 +473,6 @@ def compile_markdown(
     if errors:
         raise ValueError("\n".join(errors))
 
-    # compile the document history from the changes of all building blocks (opt-in, requires network access);
     # combined documents never have a document history
     if history and not context.get("combined"):
         context["changelog"] = compile_changelog(context, input_dir, pfs or context["id"], github_repo)
