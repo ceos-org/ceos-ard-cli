@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 
 from .changelog import parse_yaml
-from .utils.git import run_git
+from .utils.git import parse_name_status, run_git
 
 BLOCK_PATTERN = re.compile(r"^(requirements|sections|glossary)/.+\.yaml$")
 PFS_PATTERN = re.compile(r"^pfs/[^/]+/document\.yaml$")
@@ -41,22 +41,10 @@ def check_file(old_text, new_text):
 def changed_files(input_dir, base):
     input_dir = Path(input_dir).resolve()
     merge_base = run_git(["merge-base", base, "HEAD"], input_dir).strip()
-    output = run_git(["diff", "--name-status", "--relative", "--diff-filter=AMRC", merge_base], input_dir)
-    untracked = run_git(["ls-files", "--others", "--exclude-standard"], input_dir)
-    if untracked:
-        output += "".join(f"A\t{path}\n" for path in untracked.splitlines())
-    files = []
-    for line in output.splitlines():
-        parts = line.rstrip("\n").split("\t")
-        if len(parts) < 2:
-            continue
-        status = parts[0]
-        if status.startswith("A"):
-            files.append((parts[1], None))
-        elif status.startswith(("R", "C")) and len(parts) >= 3:
-            files.append((parts[2], parts[1]))
-        else:
-            files.append((parts[1], parts[1]))
+    output = run_git(["diff", "--name-status", "-z", "--relative", "--diff-filter=AMRC", merge_base], input_dir)
+    files = [(path, None if status.startswith("A") else old) for status, path, old in parse_name_status(output)]
+    untracked = run_git(["ls-files", "-z", "--others", "--exclude-standard"], input_dir)
+    files += [(path, None) for path in untracked.split("\0") if path]
     return merge_base, files
 
 

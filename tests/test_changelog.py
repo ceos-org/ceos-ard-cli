@@ -686,6 +686,23 @@ class TestGitHistory:
         assert "Change G" in history.read_file("ST-v5.0.1", "requirements/gone.yaml")
         assert history.members("ST-v5.0.1", "SR") is None
 
+    def test_identical_change_in_another_file_is_not_inherited(self, repo):
+        write_requirement(repo / "requirements/other.yaml", self.A)
+        git(repo, "add", "-A")
+        git(repo, "commit", "-q", "-m", "Same change text in another file")
+        history = GitHistory(repo)
+        assert self.released(
+            history, "requirements/other.yaml", [change("2026-04-30", "minor", "Change A", "Test")]
+        ) == [False]
+
+    def test_replaced_glossary(self, repo):
+        write_document(repo / "pfs/ST/document.yaml", "6.0.0", ["{ref: x, replace: {glossary: [crs]}}"])
+        git(repo, "commit", "-q", "-am", "Replace glossary")
+        git(repo, "tag", "ST-v6.0.0")
+        members = GitHistory(repo).members("ST-v6.0.0", "ST")
+        assert "glossary/crs.yaml" in members
+        assert "glossary/lst.yaml" not in members
+
     def test_missing_tag(self, repo):
         history = GitHistory(repo)
         with pytest.raises(ValueError, match="git fetch --tags"):

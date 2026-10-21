@@ -8,6 +8,22 @@ def run_git(args, cwd):
     return result.stdout
 
 
+def parse_name_status(output):
+    """Parse the NUL-delimited output of `git diff --name-status -z` into tuples (status, path, old_path)."""
+    tokens = output.split("\0")
+    entries = []
+    i = 0
+    while i < len(tokens) and tokens[i]:
+        status = tokens[i]
+        if status.startswith(("R", "C")):
+            entries.append((status, tokens[i + 2], tokens[i + 1]))
+            i += 3
+        else:
+            entries.append((status, tokens[i + 1], tokens[i + 1]))
+            i += 2
+    return entries
+
+
 def read_objects(names, cwd):
     """Read the given objects (e.g. blob ids or `<rev>:<path>`), None for objects that don't exist."""
     if not names:

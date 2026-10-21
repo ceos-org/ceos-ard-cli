@@ -11,7 +11,7 @@ import strictyaml
 from .schema import ANNEX_PATH, GLOSSARY_PATH, INTRODUCTION_PATH, REQUIREMENT_CATEGORY_PATH, REQUIREMENT_PATH
 from .utils.deprecation import describe_kind
 from .utils.files import fix_path, read_file
-from .utils.git import read_objects, run_git
+from .utils.git import parse_name_status, read_objects, run_git
 from .utils.requirement import slugify
 from .version import __version__
 
@@ -186,6 +186,24 @@ def _add_glossary_refs(members, data):
             _add_glossary_refs(members, value)
 
 
+def replaced_glossaries(document):
+    """Get the paths of the building blocks whose glossary is replaced by the PFS document."""
+    paths = set()
+
+    def add(template, ref):
+        if isinstance(ref, dict) and isinstance(ref.get("replace"), dict) and "glossary" in ref["replace"]:
+            _add_refs(paths, template, ref)
+
+    blocks = document.get("requirements")
+    for block in blocks if isinstance(blocks, list) else []:
+        if isinstance(block, dict):
+            add(REQUIREMENT_CATEGORY_PATH, block.get("category"))
+            reqs = block.get("requirements")
+            for req in reqs if isinstance(reqs, list) else []:
+                add(REQUIREMENT_PATH, req)
+    return paths
+
+
 def members_from_document(document, pfs):
     """Get the paths of the building blocks that are referenced by a (schema-less parsed) PFS document."""
     members = {f"pfs/{pfs}/document.yaml"}
@@ -205,9 +223,9 @@ def _change_key(change):
     return tuple(str(change.get(k) or "").strip() for k in ("date", "author", "level", "change", "reason"))
 
 
-def _match_changes(previous, changes, first_seen, default):
-    # match against the same change in the previous file version, then anywhere else (e.g. renamed files),
-    # then an edited change in the previous file version (same date and author)
+def _match_changes(previous, changes, moved, default):
+    # match against the same change in the previous file version, then in files deleted in the same commit
+    # (renamed, split or merged files), then an edited change in the previous file version (same date and author)
     keys = [_change_key(c) for c in changes]
     commits = [None] * len(keys)
     remaining = list(previous)
@@ -222,8 +240,8 @@ def _match_changes(previous, changes, first_seen, default):
     for i in range(len(keys)):
         take(i, lambda a, b: a == b)
     for i, key in enumerate(keys):
-        if commits[i] is None and key in first_seen:
-            commits[i] = first_seen[key]
+        if commits[i] is None and key in moved:
+            commits[i] = moved[key]
     for i in range(len(keys)):
         if commits[i] is None:
             take(i, lambda a, b: a[:2] == b[:2])
@@ -240,7 +258,7 @@ class GitHistory:
     def __init__(self, input_dir):
         self.cwd = Path(input_dir).resolve()
         self.files = {}
-        self.first_seen = {}
+        self.deleted = {}
         self._ancestors = {}
         self._renames = {}
         try:
@@ -284,14 +302,17 @@ class GitHistory:
         parsed = {sha: parse_changes(text or "") for sha, text in read_objects(blobs, self.cwd).items()}
 
         for commit, files in commits:
-            for path, sha, status in files:
+            moved = {}
+            for path, _, status in files:
                 if status.startswith("D"):
-                    self.files.pop(path, None)
-                    continue
-                matched = _match_changes(self.files.get(path, []), parsed.get(sha, []), self.first_seen, commit)
-                self.files[path] = matched
-                for key, first in matched:
-                    self.first_seen.setdefault(key, first)
+                    # keep the last state of deleted files, their changes may still be read from a release tag
+                    self.deleted[path] = self.files.pop(path, [])
+                    for key, first in self.deleted[path]:
+                        moved.setdefault(key, first)
+            for path, sha, status in files:
+                if not status.startswith("D"):
+                    self.files[path] = _match_changes(self.files.get(path, []), parsed.get(sha, []), moved, commit)
+                    self.deleted.pop(path, None)
 
     @classmethod
     def load(cls, input_dir):
@@ -305,7 +326,8 @@ class GitHistory:
 
     def merge_commits(self, filepath, changes):
         """Get the commits that merged the given changes of a file, None for changes that are not merged yet."""
-        return [commit for _, commit in _match_changes(self.files.get(filepath, []), changes, self.first_seen, None)]
+        previous = self.files.get(filepath, self.deleted.get(filepath, []))
+        return [commit for _, commit in _match_changes(previous, changes, {}, None)]
 
     def contains(self, tag, commit):
         if commit is None:
@@ -323,13 +345,8 @@ class GitHistory:
 
     def renames(self, tag):
         if tag not in self._renames:
-            output = self._git("diff", "-M", "--name-status", "--diff-filter=R", "--relative", tag, "HEAD")
-            renames = {}
-            for line in output.splitlines():
-                parts = line.split("\t")
-                if len(parts) == 3:
-                    renames[parts[1]] = parts[2]
-            self._renames[tag] = renames
+            output = self._git("diff", "-M", "--name-status", "-z", "--diff-filter=R", "--relative", tag, "HEAD")
+            self._renames[tag] = {old: path for _, path, old in parse_name_status(output)}
         return self._renames[tag]
 
     def members(self, tag, pfs):
@@ -339,10 +356,12 @@ class GitHistory:
         if text is None:
             print(f"WARNING [{pfs}]: Can't determine the building blocks of release {tag}")
             return None
-        members = members_from_document(parse_yaml(text), pfs)
-        # glossary terms that are referenced by the building blocks
-        for content in self.read_files(tag, sorted(members)).values():
-            if content:
+        document = parse_yaml(text)
+        members = members_from_document(document, pfs)
+        # glossary terms that are referenced by the building blocks, unless the PFS document replaces them
+        replaced = replaced_glossaries(document)
+        for member, content in self.read_files(tag, sorted(members)).items():
+            if content and member not in replaced:
                 _add_refs(members, GLOSSARY_PATH, _parse_top_level(content, "glossary"))
         renames = self.renames(tag)
         return {renames.get(member, member) for member in members}

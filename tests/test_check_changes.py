@@ -151,6 +151,16 @@ class TestCheckChanges:
         assert checked == 1
         assert errors == []
 
+    def test_non_ascii_filenames(self, repo):
+        # git quotes such paths unless NUL-delimited output is used
+        write(repo / "requirements" / "café.yaml", requirement("cafe", changes=()))
+        git(repo, "add", ".")
+        git(repo, "commit", "-q", "-m", "added")
+        write(repo / "requirements" / "thé.yaml", requirement("the", changes=()))
+        errors, checked = check_changes(repo, "main")
+        assert checked == 2
+        assert sorted(e.split(":")[0] for e in errors) == ["requirements/café.yaml", "requirements/thé.yaml"]
+
     def test_no_changes(self, repo):
         errors, checked = check_changes(repo, "main")
         assert checked == 0
