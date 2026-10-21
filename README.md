@@ -70,6 +70,7 @@ To create a combined PFS, e.g. SAR, the following command can be used:
 
 By default, HTML, PDF, and Word documents are generated.
 Pass `--pdf` to skip the PDF output and/or `--docx` to skip the Word output; the HTML version is always generated.
+If the templates in the input directory provide the pandoc Lua filter `templates/toc.lua`, it is used to add a table of contents.
 
 Check `ceos-ard generate --help` (or `ceos-ard generate --help`) for more details.
 
