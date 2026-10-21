@@ -19,6 +19,7 @@ def generate_all(
     stable: bool = False,
     history: bool = False,
     github_repo: str = DEFAULT_GITHUB_REPO,
+    patch_changes: bool = False,
 ):
     # read all folders from the pfs folder
     input_dir = Path(input_dir).resolve()
@@ -42,6 +43,7 @@ def generate_all(
                     stable,
                     history=history,
                     github_repo=github_repo,
+                    patch_changes=patch_changes,
                 )
             except Exception as e:
                 print(f"Error generating {folder}: {e}")
@@ -61,13 +63,20 @@ def generate(
     metadata: dict = {},
     history: bool = False,
     github_repo: str = DEFAULT_GITHUB_REPO,
+    patch_changes: bool = False,
 ):
     if isinstance(pfs, str):
         pfs = [pfs]
 
     input_dir = Path(input_dir).resolve()
     output = Path(output).resolve()
-    options = {"stable": stable, "metadata": metadata, "history": history, "github_repo": github_repo}
+    options = {
+        "stable": stable,
+        "metadata": metadata,
+        "history": history,
+        "github_repo": github_repo,
+        "patch_changes": patch_changes,
+    }
 
     if not no_docx:
         print("- Generating editable Markdown")

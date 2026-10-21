@@ -40,6 +40,7 @@ class TestCLI:
         assert result.exit_code == 0
         assert "--history" in result.output
         assert "--github-repo" in result.output
+        assert "--patch-changes" in result.output
 
     def test_check_changes_help(self):
         runner = CliRunner()

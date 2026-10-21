@@ -59,7 +59,8 @@ def cli():
     is_flag=True,
     default=False,
     help="Compiles the document history from the changes of all building blocks, grouped by GitHub release. "
-    "Requires network access, a GitHub token can be provided via the GITHUB_TOKEN environment variable.",
+    "Requires a git checkout with the full history and network access, "
+    "a GitHub token can be provided via the GITHUB_TOKEN environment variable.",
 )
 @click.option(
     "--github-repo",
@@ -67,7 +68,13 @@ def cli():
     show_default=True,
     help="The GitHub repository (owner/name) to read the releases from for the document history",
 )
-def compile(pfs, output, input_dir, editable, stable, debug, history, github_repo):
+@click.option(
+    "--patch-changes",
+    is_flag=True,
+    default=False,
+    help="Also lists the patch-level (editorial) changes in the document history",
+)
+def compile(pfs, output, input_dir, editable, stable, debug, history, github_repo, patch_changes):
     """
     Compiles the Markdown file for the given PFS.
     """
@@ -87,6 +94,7 @@ def compile(pfs, output, input_dir, editable, stable, debug, history, github_rep
             debug=debug,
             history=history,
             github_repo=github_repo,
+            patch_changes=patch_changes,
         )
     except Exception as e:
         if debug:
@@ -151,7 +159,8 @@ def compile(pfs, output, input_dir, editable, stable, debug, history, github_rep
     is_flag=True,
     default=False,
     help="Compiles the document history from the changes of all building blocks, grouped by GitHub release. "
-    "Requires network access, a GitHub token can be provided via the GITHUB_TOKEN environment variable.",
+    "Requires a git checkout with the full history and network access, "
+    "a GitHub token can be provided via the GITHUB_TOKEN environment variable.",
 )
 @click.option(
     "--github-repo",
@@ -159,8 +168,27 @@ def compile(pfs, output, input_dir, editable, stable, debug, history, github_rep
     show_default=True,
     help="The GitHub repository (owner/name) to read the releases from for the document history",
 )
+@click.option(
+    "--patch-changes",
+    is_flag=True,
+    default=False,
+    help="Also lists the patch-level (editorial) changes in the document history",
+)
 def generate(
-    pfs, output, input_dir, self_contained, pdf, docx, stable, id, title, version, pfs_type, history, github_repo
+    pfs,
+    output,
+    input_dir,
+    self_contained,
+    pdf,
+    docx,
+    stable,
+    id,
+    title,
+    version,
+    pfs_type,
+    history,
+    github_repo,
+    patch_changes,
 ):
     """
     Generates the Word and HTML files for the given PFS.
@@ -192,6 +220,7 @@ def generate(
             metadata,
             history=history,
             github_repo=github_repo,
+            patch_changes=patch_changes,
         )
     except Exception as e:
         print(e)
@@ -238,7 +267,8 @@ def generate(
     is_flag=True,
     default=False,
     help="Compiles the document history from the changes of all building blocks, grouped by GitHub release. "
-    "Requires network access, a GitHub token can be provided via the GITHUB_TOKEN environment variable.",
+    "Requires a git checkout with the full history and network access, "
+    "a GitHub token can be provided via the GITHUB_TOKEN environment variable.",
 )
 @click.option(
     "--github-repo",
@@ -246,7 +276,13 @@ def generate(
     show_default=True,
     help="The GitHub repository (owner/name) to read the releases from for the document history",
 )
-def generate_all(output, input_dir, self_contained, pdf, docx, pfs, stable, history, github_repo):
+@click.option(
+    "--patch-changes",
+    is_flag=True,
+    default=False,
+    help="Also lists the patch-level (editorial) changes in the document history",
+)
+def generate_all(output, input_dir, self_contained, pdf, docx, pfs, stable, history, github_repo, patch_changes):
     """
     Generates all files for all PFS.
 
@@ -265,6 +301,7 @@ def generate_all(output, input_dir, self_contained, pdf, docx, pfs, stable, hist
             stable,
             history=history,
             github_repo=github_repo,
+            patch_changes=patch_changes,
         )
         print()
         print(f"Done with {errors} errors")

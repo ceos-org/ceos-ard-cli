@@ -61,8 +61,9 @@ class FakeHistory:
         return self.files.get(path)
 
 
-def build(data, releases, input_dir, members=None, files=None):
-    return build_changelog(data, releases, FakeHistory(releases, members, files), input_dir)
+def build(data, releases, input_dir, members=None, files=None, patch_changes=True):
+    history = FakeHistory(releases, members, files)
+    return build_changelog(data, releases, history, input_dir, patch_changes=patch_changes)
 
 
 def requirement(input_dir, rel_path, req_id, title, changes=(), uid=None):
@@ -438,6 +439,43 @@ class TestBuildChangelog:
         assert versions(result) == ["6.0.0", "5.0.1"]
         assert result["versions"][0]["released"] is True
         assert "WARNING" not in capsys.readouterr().out
+
+    def test_patch_changes_are_omitted_by_default(self, tmp_path):
+        req = requirement(
+            tmp_path,
+            "metadata/time-st",
+            "time-st",
+            "Time",
+            [change("2026-08-20", "patch", "Typo", author="Bob"), change("2026-08-27", "minor", "Clarified")],
+        )
+        data = pfs_document(
+            tmp_path, "5.1.0-draft", changes=[change("2026-03-26", "patch", "Migration")], requirements=[req]
+        )
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path, patch_changes=False)
+        assert result["patch_changes"] is False
+
+        draft, old = result["versions"]
+        assert [e["change"] for e in draft["entries"]] == ["Clarified"]
+        assert draft["omitted"] == 1
+        assert [e["change"] for r in draft["rows"] for e in r["changes"]] == ["Clarified"]
+        assert draft["level"] == "minor"
+        assert draft["proposed_version"] == "5.1.0"
+        # editors of editorial changes are still listed
+        assert [e["name"] for e in draft["editors"]] == ["Bob", "Jane Doe"]
+
+        # the release only contains editorial changes
+        assert old["entries"] == []
+        assert old["rows"] == []
+        assert old["omitted"] == 1
+        assert old["level"] == "patch"
+
+    def test_patch_changes_can_be_listed(self, tmp_path):
+        data = pfs_document(tmp_path, "5.0.2-draft", changes=[change("2026-08-20", "patch", "Typo")])
+        result = build(data, [release("5.0.1", "2026-05-27")], tmp_path, patch_changes=True)
+        draft = result["versions"][0]
+        assert [e["change"] for e in draft["entries"]] == ["Typo"]
+        assert draft["omitted"] == 0
+        assert draft["proposed_version"] == "5.0.2"
 
     def test_releases_newer_than_current_are_ignored(self, tmp_path):
         data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-08-14", "major")])

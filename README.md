@@ -120,6 +120,8 @@ Edited changes and changes in renamed files keep their original commit.
 Changes that are not part of a release are listed for the draft version, together with the next version number that the changes suggest.
 This also applies if the version of the PFS document has been released already.
 Only the changes back to the previous major version are listed.
+Patch-level (editorial) changes are not listed, pass `--patch-changes` to list them as well.
+They are still considered for the change level of a version and the proposed next version number.
 For each of these releases, only the changes of building blocks that were part of the PFS in that release are listed,
 including the glossary terms that were referenced by them and following renamed files.
 Building blocks that have been deleted since are read from the release tag.

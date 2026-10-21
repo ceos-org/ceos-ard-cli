@@ -555,11 +555,12 @@ def window_min_major(current):
     return max(current[0] - 1, 0)
 
 
-def build_changelog(data, releases, history, input_dir=".", pfs=None):
+def build_changelog(data, releases, history, input_dir=".", pfs=None, patch_changes=False):
     """
     Build the document history for the given (resolved) PFS document.
 
     `history` assigns the changes to the releases and provides the building blocks of the releases, see `GitHistory`.
+    Patch-level changes are only listed if `patch_changes` is enabled.
     """
     pfs = pfs or data.get("id")
     current = parse_version(data["version"])
@@ -572,6 +573,7 @@ def build_changelog(data, releases, history, input_dir=".", pfs=None):
         "oldest_version": None,
         "latest_release": None,
         "current": current_label,
+        "patch_changes": patch_changes,
     }
     if not any(r["tuple"] < current for r in releases):
         # no previous release exists on GitHub, don't generate the history
@@ -606,9 +608,14 @@ def build_changelog(data, releases, history, input_dir=".", pfs=None):
     buckets.sort(key=lambda b: (b["tuple"], not b["released"]), reverse=True)
 
     for bucket in buckets:
+        changes = bucket["entries"]
+        # the level, the editors and the proposed version also consider the changes that are not listed
+        bucket["level"] = highest_level(e["level"] for e in changes)
+        bucket["editors"] = collect_editors(changes)
+        if not patch_changes:
+            bucket["entries"] = [e for e in changes if e["level"] != "patch"]
+        bucket["omitted"] = len(changes) - len(bucket["entries"])
         bucket["rows"] = merge_entries(bucket["entries"])
-        bucket["editors"] = collect_editors(bucket["entries"])
-        bucket["level"] = highest_level(e["level"] for e in bucket["entries"])
         bucket["proposed_version"] = None
         bucket["proposed_level"] = None
 
@@ -641,7 +648,7 @@ def _make_bucket(version, version_tuple, released_date=None, tag=None, url=None)
     }
 
 
-def compile_changelog(data, input_dir, pfs, repo=DEFAULT_GITHUB_REPO):
+def compile_changelog(data, input_dir, pfs, repo=DEFAULT_GITHUB_REPO, patch_changes=False):
     history = GitHistory.load(input_dir)
     current = parse_version(data["version"])
     for version in history.head_versions(pfs):
@@ -650,4 +657,4 @@ def compile_changelog(data, input_dir, pfs, repo=DEFAULT_GITHUB_REPO):
                 f"The release tag {pfs}-v{version} doesn't match the version {data['version']} of the PFS document"
             )
     releases = fetch_releases(repo, pfs)
-    return build_changelog(data, releases, history, input_dir, pfs)
+    return build_changelog(data, releases, history, input_dir, pfs, patch_changes)
