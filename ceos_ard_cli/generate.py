@@ -133,7 +133,7 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
     ]
 
     # optional Lua filters, only used if they are provided by the input directory
-    for name in ["changelog-table.lua"]:
+    for name in ["changelog-table.lua", "toc.lua"]:
         if (Path(input_dir) / "templates" / name).is_file():
             cmd += ["-L", f"templates/{name}"]
 
