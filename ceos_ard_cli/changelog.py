@@ -109,7 +109,7 @@ def fetch_releases(repo, pfs, token=None):
     pattern = re.compile(rf"^{re.escape(pfs)}-v(\d+\.\d+\.\d+)$")
     releases = []
     for release in _fetch_all_releases(repo, token):
-        if release.get("draft"):
+        if release.get("draft") or release.get("prerelease"):
             continue
         match = pattern.match(release.get("tag_name") or "")
         published = release.get("published_at")

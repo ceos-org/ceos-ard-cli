@@ -169,6 +169,7 @@ class TestFetchReleases:
                     {"tag_name": "ST-v5.0.1", "published_at": "2026-05-27T16:02:19Z", "html_url": "u1"},
                     {"tag_name": "SR-v5.0.2", "published_at": "2026-05-27T16:01:24Z", "html_url": "u2"},
                     {"tag_name": "ST-v6.0.0", "published_at": None, "draft": True, "html_url": "u3"},
+                    {"tag_name": "ST-v6.1.0", "published_at": "2026-06-01T00:00:00Z", "prerelease": True},
                 ],
                 {"Link": '<https://api.github.com/page2>; rel="next"'},
             ),

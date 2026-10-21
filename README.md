@@ -113,7 +113,7 @@ Pass `--history` to `ceos-ard compile`, `ceos-ard generate`, or `ceos-ard genera
 The input directory must be a git checkout with the full history and the release tags (e.g. `fetch-depth: 0` for `actions/checkout`, or `git fetch --tags` locally).
 
 The document history is compiled from the `changes` of the PFS document and of all building blocks that are used by the PFS.
-The changes are grouped by the GitHub releases of the PFS (tags `<PFS>-v<major>.<minor>.<patch>`).
+The changes are grouped by the GitHub releases of the PFS (tags `<PFS>-v<major>.<minor>.<patch>`), draft releases and pre-releases are ignored.
 As releases are always created from main, a change is part of a release if the commit that merged it into main
 (the first commit in the first-parent history of `HEAD` that contains the change) is an ancestor of the release tag.
 Edited changes and changes in renamed files keep their original commit.
