@@ -10,6 +10,8 @@ CLI for working with the [CEOS-ARD building blocks and PFSes](https://github.com
   - [`ceos-ard generate`: Create Word/HTML/PDF documents for a single PFS](#ceos-ard-generate-create-wordhtmlpdf-documents-for-a-single-pfs)
   - [`ceos-ard generate-all`: Create Word/HTML/PDF documents for all PFSes](#ceos-ard-generate-all-create-wordhtmlpdf-documents-for-all-pfses)
   - [`ceos-ard validate`: Validate CEOS-ARD components](#ceos-ard-validate-validate-ceos-ard-components)
+  - [`ceos-ard check-changes`: Check for missing changelog entries](#ceos-ard-check-changes-check-for-missing-changelog-entries)
+  - [Document History](#document-history)
 - [Development](#development)
 
 ## Getting Started
@@ -90,6 +92,49 @@ To validate (most of) the building blocks, run:
 - With traditional setup: `ceos-ard validate`
 
 Check `ceos-ard validate --help` (or `ceos-ard validate --help`) for more details.
+
+### `ceos-ard check-changes`: Check for missing changelog entries
+
+To check that all building blocks that have been changed compared to a git branch have a new entry in their `changes`, run:
+
+- With Pixi: `ceos-ard check-changes --base main`
+- With traditional setup: `ceos-ard check-changes --base main`
+
+The working tree is compared against the merge base of the given git ref and `HEAD`.
+Files that only differ in `changes` or `history` don't need a new entry.
+Requires that git is installed. The command exits with a non-zero exit code if entries are missing, so it can be used in CI.
+
+Check `ceos-ard check-changes --help` for more details.
+
+### Document History
+
+By default, the generated documents don't include the document history as compiling it requires the git history and network access.
+Pass `--history` to `ceos-ard compile`, `ceos-ard generate`, or `ceos-ard generate-all` to compile it, e.g. `ceos-ard generate ST --history --stable`.
+The input directory must be a git checkout with the full history and the release tags (e.g. `fetch-depth: 0` for `actions/checkout`, or `git fetch --tags` locally).
+
+The document history is compiled from the `changes` of the PFS document and of all building blocks that are used by the PFS.
+The changes are grouped by the GitHub releases of the PFS (tags `<PFS>-v<major>.<minor>.<patch>`), draft releases and pre-releases are ignored.
+As releases are always created from main, a change is part of a release if the commit that merged it into main
+(the first commit in the first-parent history of `HEAD` that contains the change) is an ancestor of the release tag.
+Edited changes and changes in renamed files keep their original commit.
+Changes that are not part of a release are listed for the draft version, together with the next version number that the changes suggest.
+This also applies if the version of the PFS document has been released already.
+Only the changes back to the previous major version are listed.
+Patch-level (editorial) changes are not listed, pass `--patch-changes` to list them as well.
+They are still considered for the change level of a version and the proposed next version number.
+For each of these releases, only the changes of building blocks that were part of the PFS in that release are listed,
+including the glossary terms that were referenced by them and following renamed files.
+Building blocks that have been deleted since are read from the release tag.
+
+If `HEAD` has a release tag for the PFS, its version must match the version of the PFS document.
+
+If no previous release exists on GitHub, no document history is generated.
+Combined documents never include a document history.
+
+The history is rendered as a table per version with one row per building block (document first, then sections, requirements and glossary terms in document order), listing its changes from the oldest to the newest and the highest change level. As Markdown tables can't contain lists or multiple paragraphs, the template emits the rows as fenced divs and the pandoc Lua filter `templates/changelog-table.lua` from the `ceos-ard` repository converts them into a table. The filter is only loaded if the file exists.
+
+The releases are read from the GitHub repository `ceos-org/ceos-ard`, which can be changed with `--github-repo`.
+A GitHub token can be provided through the `GITHUB_TOKEN` environment variable to avoid rate limits.
 
 ## Development
 

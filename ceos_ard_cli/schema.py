@@ -123,7 +123,6 @@ PARTIAL_SECTION = lambda file, base_path: Map(
         Optional("sections"): _SECTION_DEPS(base_path),
         Optional("glossary"): _RESOLVED_GLOSSARY(base_path),
         Optional("references"): _REFERENCE_IDS(base_path),
-        Optional("changes"): _CHANGES,
         Optional("remarks"): Markdown(),
     }
 )
@@ -155,7 +154,6 @@ PARTIAL_REQUIREMENT = lambda file, base_path: Map(
         Optional("sections"): _SECTION_DEPS(base_path),
         Optional("glossary"): _RESOLVED_GLOSSARY(base_path),
         Optional("references"): _REFERENCE_IDS(base_path),
-        Optional("changes"): _CHANGES,
         Optional("remarks"): Markdown(),
         Optional("history"): Seq(Str()),
     }
