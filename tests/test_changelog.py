@@ -19,6 +19,7 @@ from ceos_ard_cli.changelog import (
     highest_level,
     members_from_document,
     parse_version,
+    replaced_glossaries,
 )
 
 
@@ -223,6 +224,22 @@ class TestMembers:
             "requirements/metadata/time-st.yaml",
             "requirements/metadata/crs-ar.yaml",
             "requirements/per-pixel/nodata-st.yaml",
+        }
+
+
+class TestReplacedGlossaries:
+    def test_only_if_all_references_replace_the_glossary(self):
+        replaced = {"ref": "metadata/time-st", "replace": {"glossary": ["utc"]}}
+        document = {
+            "requirements": [
+                {"category": {"ref": "general-metadata", "replace": {"glossary": []}}, "requirements": [replaced]},
+                {"category": "per-pixel-metadata", "requirements": ["metadata/time-st", replaced, "per-pixel/nodata"]},
+                {"category": "other", "requirements": [{"ref": "per-pixel/cloud", "replace": {"glossary": []}}]},
+            ]
+        }
+        assert replaced_glossaries(document) == {
+            "sections/requirement-categories/general-metadata.yaml",
+            "requirements/per-pixel/cloud.yaml",
         }
 
 
@@ -694,6 +711,36 @@ class TestGitHistory:
         assert self.released(
             history, "requirements/other.yaml", [change("2026-04-30", "minor", "Change A", "Test")]
         ) == [False]
+
+    def test_renamed_file_with_edited_change(self, repo):
+        # rename and edit an existing change of a released file in the same commit
+        write_requirement(
+            repo / "requirements/x.yaml", change_yaml("2026-04-30", "Change A, fixed again"), self.B, glossary=["lst"]
+        )
+        git(repo, "mv", "requirements/x.yaml", "requirements/y.yaml")
+        git(repo, "commit", "-q", "-am", "Rename and edit")
+        history = GitHistory(repo)
+        current = [
+            change("2026-04-30", "minor", "Change A, fixed again", "Test"),
+            change("2026-05-15", "minor", "Change B", "Test"),
+        ]
+        assert self.released(history, "requirements/y.yaml", current) == [True, False]
+
+    def test_corrected_date_and_author(self, repo):
+        # correct the date of a released change and the author of another one
+        a = change_yaml("2026-04-29", "Change A, fixed")
+        b = self.B.replace("Jane Doe", "Jane M. Doe")
+        write_requirement(repo / "requirements/x.yaml", a, b, glossary=["lst"])
+        git(repo, "commit", "-q", "-am", "Correct date and author")
+        history = GitHistory(repo)
+        current = [
+            change("2026-04-29", "minor", "Change A, fixed", "Test"),
+            change("2026-05-15", "minor", "Change B", "Test", author="Jane M. Doe"),
+        ]
+        commits = history.merge_commits("requirements/x.yaml", current)
+        assert [history.contains("ST-v5.0.1", c) for c in commits] == [True, False]
+        # the author correction keeps the commit that merged change B
+        assert commits[1] is not None
 
     def test_replaced_glossary(self, repo):
         write_document(repo / "pfs/ST/document.yaml", "6.0.0", ["{ref: x, replace: {glossary: [crs]}}"])

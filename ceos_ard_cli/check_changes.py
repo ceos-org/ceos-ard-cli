@@ -22,9 +22,9 @@ def strip_ignored(data):
     return {k: v for k, v in data.items() if k not in IGNORED_KEYS}
 
 
-def count_changes(data):
+def get_changes(data):
     changes = data.get("changes")
-    return len(changes) if isinstance(changes, list) else 0
+    return changes if isinstance(changes, list) else []
 
 
 def check_file(old_text, new_text):
@@ -33,7 +33,9 @@ def check_file(old_text, new_text):
     if strip_ignored(old) == strip_ignored(new):
         # only the changes / history have been edited
         return None
-    if count_changes(new) > count_changes(old):
+    old_changes, new_changes = get_changes(old), get_changes(new)
+    # a copy of an existing entry doesn't count as a new entry
+    if len(new_changes) > len(old_changes) and any(c not in old_changes for c in new_changes):
         return None
     return "content changed, but no new entry was added to 'changes'"
 

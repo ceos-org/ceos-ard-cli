@@ -99,6 +99,9 @@ class TestHelpers:
         assert check_file("", requirement("a")) is None
         # only the changes / history edited
         assert check_file(old, old.replace("Initial", "Initial edit").replace("SR 1.2", "SR 1.3")) is None
+        # content changed, but only a copy of an existing entry was added
+        initial = CHANGE.format(date="2026-01-01", level="patch", change="Initial")
+        assert check_file(old, requirement("a", description="Changed", changes=(initial, initial))) is not None
 
 
 class TestCheckChanges:

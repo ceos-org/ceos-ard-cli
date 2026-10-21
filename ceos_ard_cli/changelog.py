@@ -187,12 +187,16 @@ def _add_glossary_refs(members, data):
 
 
 def replaced_glossaries(document):
-    """Get the paths of the building blocks whose glossary is replaced by the PFS document."""
-    paths = set()
+    """Get the paths of the building blocks whose glossary is replaced in all their references in the PFS document."""
+    replaced, kept = set(), set()
 
     def add(template, ref):
+        paths = set()
+        _add_refs(paths, template, ref)
         if isinstance(ref, dict) and isinstance(ref.get("replace"), dict) and "glossary" in ref["replace"]:
-            _add_refs(paths, template, ref)
+            replaced.update(paths)
+        else:
+            kept.update(paths)
 
     blocks = document.get("requirements")
     for block in blocks if isinstance(blocks, list) else []:
@@ -201,7 +205,7 @@ def replaced_glossaries(document):
             reqs = block.get("requirements")
             for req in reqs if isinstance(reqs, list) else []:
                 add(REQUIREMENT_PATH, req)
-    return paths
+    return replaced - kept
 
 
 def members_from_document(document, pfs):
@@ -225,7 +229,8 @@ def _change_key(change):
 
 def _match_changes(previous, changes, moved, default):
     # match against the same change in the previous file version, then in files deleted in the same commit
-    # (renamed, split or merged files), then an edited change in the previous file version (same date and author)
+    # (renamed, split or merged files), then an edited change in the previous file version
+    # (same description, e.g. with a corrected date or author, or the same date and author)
     keys = [_change_key(c) for c in changes]
     commits = [None] * len(keys)
     remaining = list(previous)
@@ -242,6 +247,9 @@ def _match_changes(previous, changes, moved, default):
     for i, key in enumerate(keys):
         if commits[i] is None and key in moved:
             commits[i] = moved[key]
+    for i in range(len(keys)):
+        if commits[i] is None:
+            take(i, lambda a, b: a[3] == b[3])
     for i in range(len(keys)):
         if commits[i] is None:
             take(i, lambda a, b: a[:2] == b[:2])
@@ -278,7 +286,7 @@ class GitHistory:
             "--first-parent",
             "--diff-merges=first-parent",
             "--reverse",
-            "--no-renames",
+            "-M",
             "--raw",
             "--no-abbrev",
             "--relative",
@@ -292,26 +300,34 @@ class GitHistory:
             lines = chunk.strip().splitlines()
             files = []
             for line in lines[1:]:
-                meta, _, path = line.partition("\t")
+                meta, _, paths = line.partition("\t")
                 meta = meta.split()
+                paths = paths.split("\t")
+                # renamed files list the old and the new path
+                path, old_path = paths[-1], paths[0] if len(paths) > 1 else None
                 if path.endswith(".yaml") and len(meta) >= 5:
-                    files.append((path, meta[3], meta[4]))
+                    files.append((path, meta[3], meta[4], old_path))
             commits.append((lines[0].strip(), files))
 
-        blobs = sorted({sha for _, files in commits for _, sha, status in files if not status.startswith("D")})
+        blobs = sorted({sha for _, files in commits for _, sha, status, _ in files if not status.startswith("D")})
         parsed = {sha: parse_changes(text or "") for sha, text in read_objects(blobs, self.cwd).items()}
 
         for commit, files in commits:
             moved = {}
-            for path, _, status in files:
-                if status.startswith("D"):
+            predecessors = {}
+            for path, _, status, old_path in files:
+                gone = path if status.startswith("D") else old_path if status.startswith("R") else None
+                if gone:
                     # keep the last state of deleted files, their changes may still be read from a release tag
-                    self.deleted[path] = self.files.pop(path, [])
-                    for key, first in self.deleted[path]:
+                    self.deleted[gone] = self.files.pop(gone, [])
+                    for key, first in self.deleted[gone]:
                         moved.setdefault(key, first)
-            for path, sha, status in files:
+                    if status.startswith("R"):
+                        predecessors[path] = self.deleted[gone]
+            for path, sha, status, _ in files:
                 if not status.startswith("D"):
-                    self.files[path] = _match_changes(self.files.get(path, []), parsed.get(sha, []), moved, commit)
+                    previous = predecessors.get(path, self.files.get(path, []))
+                    self.files[path] = _match_changes(previous, parsed.get(sha, []), moved, commit)
                     self.deleted.pop(path, None)
 
     @classmethod
