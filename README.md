@@ -129,7 +129,8 @@ Building blocks that have been deleted since are read from the release tag.
 
 If `HEAD` has a release tag for the PFS, its version must match the version of the PFS document.
 
-If no previous release exists on GitHub, no document history is generated.
+If no release exists on GitHub yet, no document history is generated.
+If versions before the oldest listed version exist (e.g. legacy documents before the first GitHub release), the document history refers to them.
 Combined documents never include a document history.
 
 The history is rendered as a table per version with one row per building block (document first, then sections, requirements and glossary terms in document order), listing its changes from the oldest to the newest and the highest change level. As Markdown tables can't contain lists or multiple paragraphs, the template emits the rows as fenced divs and the pandoc Lua filter `templates/changelog-table.lua` from the `ceos-ard` repository converts them into a table. The filter is only loaded if the file exists.

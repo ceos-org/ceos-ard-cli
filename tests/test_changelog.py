@@ -290,22 +290,81 @@ class TestCollectChanges:
 
 
 class TestBuildChangelog:
-    def test_no_previous_release_first_version(self, tmp_path):
-        data = pfs_document(tmp_path, "1.0.0", changes=[change("2026-08-14", "major")])
-        result = build(data, [], tmp_path)
+    def test_no_release_and_no_changes(self, tmp_path):
+        result = build(pfs_document(tmp_path, "1.0.0"), [], tmp_path)
         assert result["versions"] == []
         assert result["first_release"] is True
 
-        # the release of the current version itself is not a previous release
-        result = build(data, [release("1.0.0", "2026-09-01")], tmp_path)
-        assert result["versions"] == []
-        assert result["first_release"] is True
-
-    def test_no_previous_release_higher_version(self, tmp_path):
-        data = pfs_document(tmp_path, "1.1.0", changes=[change("2026-08-14", "minor")])
-        result = build(data, [], tmp_path)
+        result = build(pfs_document(tmp_path, "5.6.0"), [], tmp_path)
         assert result["versions"] == []
         assert result["first_release"] is False
+
+    def test_no_release_new_pfs(self, tmp_path):
+        # a new PFS has no document history before its first release
+        data = pfs_document(tmp_path, "1.0.0-draft", changes=[change("2026-08-14", "major")])
+        result = build(data, [], tmp_path)
+        assert result["versions"] == []
+        assert result["first_release"] is True
+
+    def test_current_version_is_the_only_release(self, tmp_path):
+        # e.g. the first release on GitHub after the legacy documents
+        data = pfs_document(
+            tmp_path,
+            "5.0.2-draft",
+            changes=[change("2026-03-26", "minor", "Migration"), change("2026-08-31", "minor", "Fix")],
+        )
+        result = build(data, [release("5.0.2", "2026-05-27")], tmp_path)
+        assert versions(result) == ["5.0.2-draft", "5.0.2"]
+        assert [e["change"] for e in entries(result, "5.0.2", released=True)] == ["Migration"]
+        assert [e["change"] for e in entries(result, "5.0.2-draft", released=False)] == ["Fix"]
+        assert result["versions"][0]["proposed_version"] == "5.1.0"
+        # the versions before 5.0.2 are in the legacy documents
+        assert result["truncated"] is True
+        assert result["oldest_version"] == "5.0.2"
+
+    def test_initial_release(self, tmp_path):
+        # e.g. a new PFS that reuses building blocks which were changed for other PFS
+        req = requirement(tmp_path, "metadata/time-st", "time-st", "Time", [change("2026-08-27", "major", "For ST")])
+        data = pfs_document(tmp_path, "1.0.0", requirements=[req])
+        result = build(data, [release("1.0.0", "2026-10-22")], tmp_path)
+        assert result["versions"] == []
+        assert result["first_release"] is True
+
+    def test_after_initial_release(self, tmp_path):
+        req = requirement(
+            tmp_path,
+            "metadata/time-st",
+            "time-st",
+            "Time",
+            [change("2026-08-27", "major", "For ST"), change("2026-11-02", "minor", "For SBT")],
+        )
+        data = pfs_document(tmp_path, "1.1.0-draft", requirements=[req])
+        result = build(data, [release("1.0.0", "2026-10-22")], tmp_path)
+        assert versions(result) == ["1.1.0-draft", "1.0.0"]
+        assert [e["change"] for e in entries(result, "1.1.0-draft")] == ["For SBT"]
+        initial = result["versions"][1]
+        assert initial["initial"] is True
+        assert initial["entries"] == []
+        # nothing older than 1.0.0 exists
+        assert result["truncated"] is False
+
+    def test_no_release_higher_version(self, tmp_path, capsys):
+        # e.g. the migration to building blocks of a PFS that has no release on GitHub yet
+        req = requirement(tmp_path, "metadata/time", "time", "Time", [change("2026-07-20", "minor", "Migrated")])
+        data = pfs_document(
+            tmp_path, "5.6.0-draft", changes=[change("2026-07-20", "minor", "Split")], requirements=[req]
+        )
+        result = build(data, [], tmp_path)
+        assert versions(result) == ["5.6.0-draft"]
+        draft = result["versions"][0]
+        assert draft["released"] is False
+        assert sorted(e["change"] for e in draft["entries"]) == ["Migrated", "Split"]
+        # there is no release to propose the next version number from
+        assert draft["proposed_version"] is None
+        assert result["latest_release"] is None
+        # the versions before 5.6.0 are in the legacy documents
+        assert result["truncated"] is True
+        assert "WARNING" not in capsys.readouterr().out
 
     def test_buckets_by_release(self, tmp_path, capsys):
         req = requirement(tmp_path, "per-pixel/surface-st", "surface-st", "Surface", [change("2026-07-31", "major")])
@@ -320,7 +379,8 @@ class TestBuildChangelog:
         assert versions(result) == ["6.0.0-draft", "5.0.1"]
         assert result["latest_release"] == "5.0.1"
         assert result["oldest_version"] == "5.0.1"
-        assert result["truncated"] is False
+        # the versions before 5.0.1 are in the legacy documents
+        assert result["truncated"] is True
         assert result["first_release"] is False
 
         draft = result["versions"][0]

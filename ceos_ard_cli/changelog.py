@@ -610,14 +610,9 @@ def build_changelog(data, releases, history, input_dir=".", pfs=None, patch_chan
         "current": current_label,
         "patch_changes": patch_changes,
     }
-    if not any(r["tuple"] < current for r in releases):
-        # no previous release exists on GitHub, don't generate the history
-        result["first_release"] = current == (1, 0, 0)
-        return result
-
     released = [r for r in releases if r["tuple"] <= current]
-    latest = released[-1]
-    result["latest_release"] = latest["version"]
+    latest = released[-1] if released else None
+    result["latest_release"] = latest["version"] if latest else None
     min_major = window_min_major(current)
     members_by_version = {r["version"]: history.members(r["tag"], pfs) for r in released if r["tuple"][0] >= min_major}
 
@@ -630,17 +625,31 @@ def build_changelog(data, releases, history, input_dir=".", pfs=None, patch_chan
     unreleased = _make_bucket(current_label, current)
     for entry in entries:
         bucket = next((b for b in buckets if history.contains(b["tag"], entry["commit"])), unreleased)
+        if bucket["initial"]:
+            # the initial version of a PFS lists no changes, e.g. its building blocks were changed for other PFS
+            continue
         members = members_by_version.get(bucket["version"]) if bucket["released"] else current_members
         if members is not None and entry["block"]["filepath"] not in members:
             # the building block was not part of the PFS in this version
             continue
         bucket["entries"].append(entry)
-    if latest["tuple"] != current or unreleased["entries"]:
+    if latest is None and (current <= (1, 0, 0) or not unreleased["entries"]):
+        # a new PFS without a release on GitHub, or no recorded changes at all
+        result["first_release"] = current <= (1, 0, 0)
+        return result
+    # an existing PFS without a release on GitHub (e.g. only legacy documents),
+    # all recorded changes are listed for the current version
+    if latest is None or latest["tuple"] != current or unreleased["entries"]:
         buckets.append(unreleased)
+    if len(buckets) == 1 and buckets[0]["initial"]:
+        # the release of the initial version
+        result["first_release"] = True
+        return result
 
-    result["truncated"] = any(b["tuple"][0] < min_major for b in buckets)
     buckets = [b for b in buckets if b["tuple"][0] >= min_major]
     buckets.sort(key=lambda b: (b["tuple"], not b["released"]), reverse=True)
+    # older versions exist (possibly before the GitHub releases), unless the history goes back to 1.0.0
+    result["truncated"] = buckets[-1]["tuple"] > (1, 0, 0)
 
     for bucket in buckets:
         changes = bucket["entries"]
@@ -654,7 +663,7 @@ def build_changelog(data, releases, history, input_dir=".", pfs=None, patch_chan
         bucket["proposed_version"] = None
         bucket["proposed_level"] = None
 
-    if unreleased.get("level"):
+    if latest and unreleased.get("level"):
         proposed = bump_version(latest["tuple"], unreleased["level"])
         unreleased["proposed_version"] = format_version(proposed)
         unreleased["proposed_level"] = unreleased["level"]
@@ -667,7 +676,7 @@ def build_changelog(data, releases, history, input_dir=".", pfs=None, patch_chan
 
     result["versions"] = buckets
     if buckets:
-        result["oldest_version"] = buckets[-1]["version"]
+        result["oldest_version"] = format_version(buckets[-1]["tuple"])
     return result
 
 
@@ -677,6 +686,8 @@ def _make_bucket(version, version_tuple, released_date=None, tag=None, url=None)
         "tuple": version_tuple,
         "date": released_date,
         "released": tag is not None,
+        # the release of a new PFS, which never lists changes
+        "initial": tag is not None and version_tuple == (1, 0, 0),
         "tag": tag,
         "url": url,
         "entries": [],
