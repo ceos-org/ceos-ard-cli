@@ -12,7 +12,7 @@ from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.deprecation import find_deprecated
 from .utils.files import read_file, write_file
 from .utils.pfs import read_pfs
-from .utils.template import read_template
+from .utils.template import read_document_sections, read_template
 
 
 def topological_sort_requirements(
@@ -319,6 +319,41 @@ def resolve_refs(data):
     return data
 
 
+def read_data(pfs: list[str], input_dir: Path, stable: bool = False, metadata: dict = {}, warn: bool = True) -> dict:
+    """The data for the template of one PFS or of several PFS combined."""
+    multi_pfs = {}
+    for p in pfs:
+        # read the PFS information,
+        # resolve ref/replace/append patterns and
+        # move the glossary and references to the top level
+        multi_pfs[p] = bubble_up(resolve_refs(read_pfs(p, input_dir)))
+        if warn:
+            for descriptor in find_deprecated(multi_pfs[p]):
+                print(f"WARNING [{p}]: {descriptor} is deprecated")
+
+    if len(pfs) > 1:
+        data = combine_pfs(multi_pfs)
+    else:
+        data = multi_pfs[pfs[0]]
+        data["combined"] = False
+
+    data["stable"] = stable
+
+    if isinstance(data["authors"], list):
+        # Convert list of authors to Markdown
+        data["authors"] = "\n".join(map(lambda a: f"- {a}", data["authors"]))
+
+    # Override metadata if provided
+    data["id"] = metadata.get("id") or data["id"]
+    data["title"] = metadata.get("title") or data["title"]
+    data["type"] = metadata.get("type") or data["type"]
+    if metadata.get("version"):
+        data["version"] = metadata["version"]
+    elif not stable:
+        data["version"] = data["version"] + "-draft"
+    return data
+
+
 def compile(
     pfs: Union[list[str], str],
     out: Union[Path, str],
@@ -350,34 +385,7 @@ def compile(
         logger.setLevel(logging.INFO if debug else logging.CRITICAL)
         sync(str(assets_source), str(assets_target), "sync", create=True, purge=True, content=True, logger=logger)
 
-    multi_pfs = {}
-    for p in pfs:
-        # read the PFS information,
-        # resolve ref/replace/append patterns and
-        # move the glossary and references to the top level
-        multi_pfs[p] = bubble_up(resolve_refs(read_pfs(p, input_dir)))
-        for descriptor in find_deprecated(multi_pfs[p]):
-            print(f"WARNING [{p}]: {descriptor} is deprecated")
-
-    if len(pfs) > 1:
-        data = combine_pfs(multi_pfs)
-    else:
-        data = multi_pfs[pfs[0]]
-
-    data["stable"] = stable
-
-    if isinstance(data["authors"], list):
-        # Convert list of authors to Markdown
-        data["authors"] = "\n".join(map(lambda a: f"- {a}", data["authors"]))
-
-    # Override metadata if provided
-    data["id"] = metadata.get("id") or data["id"]
-    data["title"] = metadata.get("title") or data["title"]
-    data["type"] = metadata.get("type") or data["type"]
-    if metadata.get("version"):
-        data["version"] = metadata["version"]
-    elif not stable:
-        data["version"] = data["version"] + "-draft"
+    data = read_data(pfs, input_dir, stable, metadata)
 
     if stable:
         out = out.parent / f"{out.stem}-v{data['version']}"
@@ -429,16 +437,20 @@ def append_requirement(target, req):
     target["metadata"].update(req["metadata"])
 
 
-def compile_markdown(
+def compile_markdown(data, out, editable, input_dir: Path, **options):
+    write_file(out, render_markdown(data, editable, input_dir, **options))
+
+
+def render_markdown(
     data,
-    out,
     editable,
     input_dir: Path,
     history: bool = False,
     github_repo: str = DEFAULT_GITHUB_REPO,
     patch_changes: bool = False,
     pfs: str = None,
-):
+    strict: bool = False,
+) -> str:
     input_dir = Path(input_dir).resolve()
     # create a copy of the data for the template
     context = data.copy()
@@ -482,7 +494,8 @@ def compile_markdown(
     else:
         context["changelog"] = None
 
-    # read, fill and write the template
-    template = read_template(input_dir)
-    markdown = template.render(**context)
-    write_file(out, markdown)
+    context["document"] = read_document_sections(input_dir)
+
+    # read and fill the template
+    template = read_template(input_dir, strict)
+    return template.render(**context)

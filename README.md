@@ -70,7 +70,6 @@ To create a combined PFS, e.g. SAR, the following command can be used:
 
 By default, HTML, PDF, and Word documents are generated.
 Pass `--pdf` to skip the PDF output and/or `--docx` to skip the Word output; the HTML version is always generated.
-If the templates in the input directory provide the pandoc Lua filter `templates/toc.lua`, it is used to add a table of contents.
 
 Check `ceos-ard generate --help` (or `ceos-ard generate --help`) for more details.
 
@@ -133,10 +132,26 @@ If no release exists on GitHub yet, no document history is generated.
 If versions before the oldest listed version exist (e.g. legacy documents before the first GitHub release), the document history refers to them.
 Combined documents never include a document history.
 
-The history is rendered as a table per version with one row per building block (document first, then sections, requirements and glossary terms in document order), listing its changes from the oldest to the newest and the highest change level. As Markdown tables can't contain lists or multiple paragraphs, the template emits the rows as fenced divs and the pandoc Lua filter `templates/changelog-table.lua` from the `ceos-ard` repository converts them into a table. The filter is only loaded if the file exists.
+The history is rendered as a table per version with one row per building block (document first, then sections, requirements and glossary terms in document order), listing its changes from the oldest to the newest and the highest change level. As Markdown tables can't contain lists or multiple paragraphs, the template emits the rows as fenced divs and the pandoc Lua filter `changelog-table.lua` converts them into a table.
 
 The releases are read from the GitHub repository `ceos-org/ceos-ard`, which can be changed with `--github-repo`.
 A GitHub token can be provided through the `GITHUB_TOKEN` environment variable to avoid rate limits.
+
+## Templates
+
+The layout of the documents is part of the CLI, see the [templates](ceos_ard_cli/templates) folder:
+the Markdown template, the pandoc templates for HTML and Word, the header and footer of the PDF and the pandoc Lua filters.
+A file with the same name in the `templates` folder of the input directory replaces the built-in one.
+
+The texts that all PFSes share are read from Markdown files in `sections/document` of the input directory:
+
+- `draft.md`: shown at the top of draft versions
+- `status.md`: the document status
+- `definition.md`: the CEOS-ARD definition
+- `introduction.md`: the introduction before the introductory sections of the PFS
+
+Each file starts with a heading (of any level), which becomes the section title, followed by plain Markdown.
+The texts can't use template variables. A missing file leaves its text out of the documents.
 
 ## Development
 

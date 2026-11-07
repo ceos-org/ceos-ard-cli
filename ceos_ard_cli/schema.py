@@ -23,6 +23,8 @@ INTRODUCTION_PATH = "./sections/introduction/{id}.yaml"
 ANNEX_PATH = "./sections/annexes/{id}.yaml"
 REQUIREMENT_CATEGORY_PATH = "./sections/requirement-categories/{id}.yaml"
 REQUIREMENT_PATH = "./requirements/{id}.yaml"
+DOCUMENT_SECTION_PATH = "./sections/document/{id}.md"
+DOCUMENT_SECTIONS = ["draft", "status", "definition", "introduction"]
 
 
 _REFS = lambda path, base_path, schema=None, resolve=False: (
