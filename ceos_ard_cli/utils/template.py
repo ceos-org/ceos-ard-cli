@@ -9,7 +9,7 @@ from jinja2 import (
     Template,
     TemplateNotFound,
     Undefined,
-    meta,
+    nodes,
 )
 
 from ..schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS
@@ -62,15 +62,39 @@ def check_template(input_dir: Path) -> None:
         ast = env.parse(source, name)
         # compiles it, which catches unknown filters and tests
         env.compile(ast, name)
-        for referenced in meta.find_referenced_templates(ast):
-            if referenced is None:
+        for node in ast.find_all((nodes.Include, nodes.Import, nodes.FromImport, nodes.Extends)):
+            candidates = _template_names(node.template)
+            optional = getattr(node, "ignore_missing", False)
+            if candidates is None:
+                if optional:
+                    continue
                 raise ValueError(f"{name} references a template by a variable, which can't be checked")
-            if referenced not in checked:
-                try:
-                    env.loader.get_source(env, referenced)
-                except TemplateNotFound:
-                    raise ValueError(f"{name} references the missing template {referenced}") from None
-                pending.append(referenced)
+            # Of a list, the first existing template is used
+            found = next((c for c in candidates if _exists(env, c)), None)
+            if found is not None:
+                pending.append(found)
+            elif not optional:
+                raise ValueError(f"{name} references the missing template {' or '.join(candidates)}")
+
+
+def _template_names(node: nodes.Node) -> list[str] | None:
+    """The template names of a reference, None if they come from a variable."""
+    if isinstance(node, nodes.Const):
+        value = node.value
+        values = value if isinstance(value, (list, tuple)) else [value]
+    elif isinstance(node, (nodes.List, nodes.Tuple)) and all(isinstance(item, nodes.Const) for item in node.items):
+        values = [item.value for item in node.items]
+    else:
+        return None
+    return list(values) if all(isinstance(value, str) for value in values) else None
+
+
+def _exists(env: Environment, name: str) -> bool:
+    try:
+        env.loader.get_source(env, name)
+        return True
+    except TemplateNotFound:
+        return False
 
 
 def read_document_sections(input_dir: Path) -> dict:
@@ -85,7 +109,8 @@ def read_document_sections(input_dir: Path) -> dict:
 def read_document_section(file: Path) -> dict:
     """A Markdown file whose first line is a heading of any level: the heading is the title, the rest the text."""
     content = read_file(file).strip()
-    match = re.match(r"#+[ \t]+(.+?)[ \t#]*(?:\n|$)", content)
+    # A closing sequence of #s needs a space before it, so `## C#` keeps its #
+    match = re.match(r"#+[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*(?:\n|$)", content)
     if not match:
         raise ValueError(f"{fix_path(file)} must start with a heading")
     return {

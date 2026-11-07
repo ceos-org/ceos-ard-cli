@@ -52,7 +52,7 @@ Product Family Specification, ~{ type }~, ~{ title }~
 ~{ document.status.description }~
 ~( endif )~
 
-## ~( if combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~Contributing Authors
+## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~Contributing Authors
 
 ~( if combined )~
 See the authors list in the separate PFS documents.
@@ -73,7 +73,7 @@ See the authors list in the separate PFS documents.
 ~( endif )~
 ## Description
 
-~( if combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~
+~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~
 **Product Family Specification:**
 ~{type}~, ~{ title }~ (~{ id }~)
 
@@ -85,7 +85,7 @@ See the authors list in the separate PFS documents.
 ~(   if combined and applies_to is mapping )~
 
 ~(     for key, value in applies_to.items() )~
-- **~{ key }~**: ~{ value }~
+- **~{ key }~**: ~{ value | indent(2) }~
 ~(     endfor )~
 ~(   else )~
 ~{     applies_to }~
@@ -115,12 +115,16 @@ See the authors list in the separate PFS documents.
 ~( for term in glossary )~
 <!-- edit:~{ term.filepath }~ -->
 ~{ term.term }~
-:   ~{ term.description | rstrip }~
+~# A blank line makes the definition loose, otherwise pandoc renders its paragraphs as one #~
+~( if "\n\n" in term.description | rstrip )~
+
+~( endif )~
+:   ~{ term.description | rstrip | indent(4) }~
 
 ~( endfor )~
 &#12;
 
-## ~( if combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~Requirements
+## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~Requirements
 
 **WARNING:** The section numbers in front of the title (e.g. 1.1) are not stable and may change or may be removed at any time.
 Do **not** use the numbers to refer back to specific requirements!
@@ -162,7 +166,7 @@ Applies to: ~{ ", ".join(requirement.applies_to) }~
 Note~( if requirement[type].notes | length > 1)~s~( endif )~:
 
 ~(           for note in requirement[type].notes )~
-~{ loop.index }~. ~{ note }~
+~{ loop.index }~. ~{ note | indent(loop.index | string | length + 2) }~
 ~(           endfor )~
 
 ~(         endif )~
@@ -195,7 +199,7 @@ Note~( if requirement[type].notes | length > 1)~s~( endif )~:
 | Requirement ID | Requirement Title | Threshold | Goal |
 | -------------- | ----------------- | :-------: | :--: |
 ~(   for requirement in block.requirements )~
-| `~{ requirement.uid }~` | ~{ requirement.title }~ | ~( if not requirement.threshold )~_not required_~( endif )~ | ~( if not requirement.goal )~_as threshold_~( endif )~ |
+| `~{ requirement.uid }~` | ~{ requirement.title.replace("\n", " ") }~ | ~( if not requirement.threshold )~_not required_~( endif )~ | ~( if not requirement.goal )~_as threshold_~( endif )~ |
 ~(   endfor )~
 
 ~( endfor )~
