@@ -252,3 +252,38 @@ def test_multiline_applies_to_of_combined_documents_stays_in_its_list_item(tmp_p
     markdown = read_template(tmp_path).render(**data, document=read_document_sections(tmp_path))
 
     assert "- **A**: First paragraph.\n\n  Second paragraph.\n\n  - item\n- **B**: Single.\n" in markdown
+
+
+def test_titles_are_read_as_a_single_line():
+    import strictyaml
+
+    from ceos_ard_cli.strictyaml.single_line import SingleLine
+
+    data = strictyaml.load(
+        "title: |-\n  Spatial\n  resolution  of\n\n  bands\n", strictyaml.Map({"title": SingleLine()})
+    )
+
+    assert data.data["title"] == "Spatial resolution of bands"
+
+
+def test_table_cells_escape_pipes(tmp_path):
+    requirement = {
+        "uid": "x",
+        "title": "Spatial | Spectral",
+        "description": "",
+        "filepath": "x.yaml",
+        "threshold": {"description": "Threshold.", "notes": []},
+        "goal": None,
+    }
+    category = {"id": "c", "title": "Category", "description": "", "filepath": "c.yaml"}
+    data = context(editable=True, requirements=[{"category": category, "requirements": [requirement]}])
+
+    markdown = read_template(tmp_path).render(**data, document=read_document_sections(tmp_path))
+
+    assert "| `x` | Spatial \| Spectral |" in markdown
+
+
+def test_document_sections_keep_the_indentation_of_their_text(tmp_path):
+    file = write(tmp_path / "status.md", "\n## Status\n\n\n    code block\n\nText  \n\n")
+
+    assert read_document_section(file)["description"] == "    code block\n\nText"

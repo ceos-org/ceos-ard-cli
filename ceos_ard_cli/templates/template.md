@@ -199,7 +199,7 @@ Note~( if requirement[type].notes | length > 1)~s~( endif )~:
 | Requirement ID | Requirement Title | Threshold | Goal |
 | -------------- | ----------------- | :-------: | :--: |
 ~(   for requirement in block.requirements )~
-| `~{ requirement.uid }~` | ~{ requirement.title.replace("\n", " ") }~ | ~( if not requirement.threshold )~_not required_~( endif )~ | ~( if not requirement.goal )~_as threshold_~( endif )~ |
+| `~{ requirement.uid }~` | ~{ table_cell(requirement.title) }~ | ~( if not requirement.threshold )~_not required_~( endif )~ | ~( if not requirement.goal )~_as threshold_~( endif )~ |
 ~(   endfor )~
 
 ~( endfor )~

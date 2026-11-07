@@ -40,7 +40,13 @@ def template_environment(input_dir: Path, strict: bool = False) -> Environment:
     )
     env.filters["rstrip"] = lambda x: x.rstrip()
     env.filters["slugify"] = slugify
+    env.globals["table_cell"] = table_cell
     return env
+
+
+def table_cell(text: str) -> str:
+    """Text for a cell of a pipe table, which a line break or an unescaped | would end."""
+    return " ".join(str(text).split()).replace("|", "\\|")
 
 
 def read_template(input_dir: Path, strict: bool = False) -> Template:
@@ -108,13 +114,14 @@ def read_document_sections(input_dir: Path) -> dict:
 
 def read_document_section(file: Path) -> dict:
     """A Markdown file whose first line is a heading of any level: the heading is the title, the rest the text."""
-    content = read_file(file).strip()
+    content = read_file(file)
     # A closing sequence of #s needs a space before it, so `## C#` keeps its #
-    match = re.match(r"#+[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*(?:\n|$)", content)
+    match = re.match(r"\s*#+[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*(?:\r?\n|$)", content)
     if not match:
         raise ValueError(f"{fix_path(file)} must start with a heading")
     return {
         "filepath": fix_path(file),
         "title": match.group(1),
-        "description": content[match.end() :].strip(),
+        # Only blank lines are removed at the start, the indentation of the first line can matter (e.g. code)
+        "description": re.sub(r"^(?:[ \t]*\r?\n)+", "", content[match.end() :]).rstrip(),
     }
