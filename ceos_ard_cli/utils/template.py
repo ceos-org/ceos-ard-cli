@@ -46,7 +46,8 @@ def template_environment(input_dir: Path, strict: bool = False) -> Environment:
 
 def table_cell(text: str) -> str:
     """Text for a cell of a pipe table, which a line break or an unescaped | would end."""
-    return " ".join(str(text).split()).replace("|", "\\|")
+    # a pipe after an odd number of backslashes is already escaped
+    return re.sub(r"(?<!\\)((?:\\\\)*)\|", r"\1\\|", " ".join(str(text).split()))
 
 
 def read_template(input_dir: Path, strict: bool = False) -> Template:

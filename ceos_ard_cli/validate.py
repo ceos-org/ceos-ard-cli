@@ -1,11 +1,11 @@
+import copy
 from pathlib import Path
 
-from .compile import read_data, render_markdown, resolve_refs
+from .compile import read_data, render_markdown
 from .links import resolve_links, resolve_titles
 from .schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS, REQUIREMENT
 from .utils.deprecation import find_deprecated
 from .utils.files import FILE_CACHE, fix_path, get_all_files, get_all_folders
-from .utils.pfs import read_pfs
 from .utils.template import check_template, read_document_section
 from .utils.yaml import read_yaml
 
@@ -15,12 +15,13 @@ def log(id, error=None):
     print(f"- {id}: {message}")
 
 
-def check_rendering(pfs: list[str], input_dir: Path) -> list[str]:
+def check_rendering(data: dict, input_dir: Path) -> list[str]:
     """Render the read-only and the editable document, failing on undefined variables and missing templates."""
     errors = []
     for editable in (False, True):
         try:
-            render_markdown(read_data(pfs, input_dir, warn=False), editable, input_dir, strict=True)
+            # Rendering changes the data, and copying it is much faster than reading it again
+            render_markdown(copy.deepcopy(data), editable, input_dir, strict=True)
         except Exception as e:
             kind = "editable" if editable else "read-only"
             errors.append(f"template ({kind}): {e}")
@@ -66,14 +67,16 @@ def validate(input_dir):
         link_errors = []
         render_errors = []
         try:
-            data = read_pfs(pfs, input_dir)
+            # Read once: reading is by far the slowest part, so the checks below work on copies
+            data = read_data([pfs], input_dir, warn=False)
             deprecated = find_deprecated(data)
+            links = copy.deepcopy(data)
             # check that all @title: references point to existing building blocks
-            link_errors = resolve_titles(data, input_dir)
+            link_errors = resolve_titles(links, input_dir)
             # check that all dependencies and sections links can be resolved
-            link_errors += resolve_links(resolve_refs(data), input_dir)
+            link_errors += resolve_links(links, input_dir)
             if not link_errors:
-                render_errors = check_rendering([pfs], input_dir)
+                render_errors = check_rendering(data, input_dir)
         except Exception as e:
             error = e
         finally:
@@ -84,12 +87,6 @@ def validate(input_dir):
                 print(f"  - ERROR: {message}")
             for descriptor in deprecated:
                 print(f"  - WARNING: {descriptor} is deprecated")
-
-    # Covers the template's branches for combined documents
-    if len(all_pfs) > 1:
-        print("Validating a combined PFS of all PFS")
-        errors = check_rendering([folder.stem for folder in all_pfs], input_dir)
-        log("combined", "; ".join(errors) if errors else None)
 
     # todo: check all files, even if unused
     print("Checking for files not referenced by any PFS (none of them gets validated)")

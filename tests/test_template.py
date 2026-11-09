@@ -8,6 +8,7 @@ from ceos_ard_cli.utils.template import (
     read_document_section,
     read_document_sections,
     read_template,
+    table_cell,
     template_file,
 )
 
@@ -281,6 +282,21 @@ def test_table_cells_escape_pipes(tmp_path):
     markdown = read_template(tmp_path).render(**data, document=read_document_sections(tmp_path))
 
     assert "| `x` | Spatial \| Spectral |" in markdown
+
+
+@pytest.mark.parametrize(
+    "text, cell",
+    [
+        ("a | b", r"a \| b"),
+        (r"a \| b", r"a \| b"),
+        (r"a \\| b", r"a \\\| b"),
+        (r"a \\\| b", r"a \\\| b"),
+        ("|a|", r"\|a\|"),
+        ("a\n  b", "a b"),
+    ],
+)
+def test_table_cell_escapes_only_unescaped_pipes(text, cell):
+    assert table_cell(text) == cell
 
 
 def test_document_sections_keep_the_indentation_of_their_text(tmp_path):
