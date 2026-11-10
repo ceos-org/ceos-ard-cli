@@ -5,7 +5,7 @@ from .compile import read_data, render_markdown
 from .links import resolve_links, resolve_titles
 from .schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS, REQUIREMENT
 from .utils.deprecation import find_deprecated
-from .utils.files import FILE_CACHE, fix_path, get_all_files, get_all_folders
+from .utils.files import FILE_CACHE, check_no_symlinks, fix_path, get_all_files, get_all_folders
 from .utils.template import check_template, read_document_section
 from .utils.yaml import read_yaml
 
@@ -30,6 +30,18 @@ def check_rendering(data: dict, input_dir: Path) -> list[str]:
 
 def validate(input_dir):
     input_dir = Path(input_dir).resolve()
+    print("Checking for symbolic links")
+    error = None
+    try:
+        check_no_symlinks(input_dir)
+    except Exception as e:
+        error = e
+    finally:
+        log("content folder", error)
+    if error is not None:
+        # The other checks would read the files the links point to
+        return
+
     # Validate PFS template
     print("Validating PFS template")
     error = None

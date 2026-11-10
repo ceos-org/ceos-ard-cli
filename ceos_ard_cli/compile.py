@@ -10,7 +10,7 @@ from .changelog import DEFAULT_GITHUB_REPO, compile_changelog
 from .links import resolve_links, resolve_titles
 from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.deprecation import find_deprecated
-from .utils.files import read_file, write_file
+from .utils.files import check_no_symlinks, content_file, read_file, write_file
 from .utils.pfs import read_pfs
 from .utils.template import read_document_sections, read_template
 
@@ -369,6 +369,7 @@ def compile(
     if isinstance(pfs, str):
         pfs = [pfs]
 
+    check_no_symlinks(input_dir)
     out = Path(out)
     folder = out.parent
     # create folder if needed
@@ -418,7 +419,7 @@ def compile_bibtex(data, out, input_dir: Path):
     references = []
     # Read references form disk
     for ref in data["references"]:
-        filepath = input_dir / REFERENCE_PATH.format(id=ref)
+        filepath = content_file(input_dir, REFERENCE_PATH.format(id=ref))
         bibtex = read_file(filepath)
         references.append(bibtex)
     # Merge into a single string
