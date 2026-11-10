@@ -2,7 +2,7 @@ import bibtexparser
 import strictyaml
 
 from ..utils.files import content_file, read_file
-from ..utils.yaml import read_yaml
+from ..utils.yaml import read_yaml, skip_if_being_read
 
 
 class IdReference(strictyaml.ScalarValidator):
@@ -21,9 +21,12 @@ class IdReference(strictyaml.ScalarValidator):
         if not file.exists():
             chunk.expecting_but_found(f"expecting an existing file at {file} for id '{chunk.contents}'")
         elif file.suffix == ".yaml":
-            content = read_yaml(file, self._schema, self._base_path)
-            if "id" not in content or len(content["id"]) == 0:
-                content["id"] = chunk.contents
+            # A dependency on a file that is being read (e.g. requirements that depend on each other)
+            # is validated by that read already
+            if self._resolve or not skip_if_being_read(file):
+                content = read_yaml(file, self._schema, self._base_path)
+                if "id" not in content or len(content["id"]) == 0:
+                    content["id"] = chunk.contents
         elif file.suffix == ".bib":
             content = read_file(file)
             library = bibtexparser.parse_string(content)
