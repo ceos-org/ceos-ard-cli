@@ -2,9 +2,11 @@
 
 import base64
 import http.server
+import importlib.util
 import os
 import re
 import shutil
+import subprocess
 import threading
 from pathlib import Path
 
@@ -15,6 +17,7 @@ from ceos_ard_cli.generate import ORIGIN, local_file, run_pandoc, run_playwright
 from ceos_ard_cli.links import resolve_titles
 from ceos_ard_cli.schema import REFERENCE_PATH
 from ceos_ard_cli.strictyaml.id_reference import IdReference
+from ceos_ard_cli.utils import files
 from ceos_ard_cli.utils.files import check_no_symlinks, content_file
 from ceos_ard_cli.validate import validate
 
@@ -86,6 +89,21 @@ class TestPaths:
             pytest.skip("can't create symlinks")
         with pytest.raises(ValueError, match=Path(link).name):
             check_no_symlinks(tmp_path / "content")
+
+    @pytest.mark.skipif(os.name != "nt", reason="junctions only exist on Windows")
+    def test_junctions_are_refused(self, tmp_path, monkeypatch):
+        # Python 3.11 has no os.path.isjunction
+        monkeypatch.delattr(os.path, "isjunction", raising=False)
+        (tmp_path / "outside").mkdir()
+        (tmp_path / "content").mkdir()
+        link, target = tmp_path / "content" / "assets", tmp_path / "outside"
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], check=True, capture_output=True)
+        # A copy of the module that is loaded as on Python 3.11
+        spec = importlib.util.spec_from_file_location("files_without_isjunction", files.__file__)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with pytest.raises(ValueError, match="assets"):
+            module.check_no_symlinks(tmp_path / "content")
 
     def test_no_symlinks(self, tmp_path):
         write(tmp_path / "assets" / "logo.png", "")

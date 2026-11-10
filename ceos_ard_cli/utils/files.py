@@ -1,9 +1,15 @@
 import os
+import stat
 from pathlib import Path
 
 FILE_CACHE = {}
-# Windows junctions are links as well, Python < 3.12 can't detect them
-_is_junction = getattr(os.path, "isjunction", lambda path: False)
+
+
+def _is_junction(path):
+    # Windows junctions are links as well; the same check as os.path.isjunction, which needs Python 3.12.
+    # Only Windows has reparse tags (and the constant).
+    tag = getattr(os.lstat(path), "st_reparse_tag", None)
+    return tag is not None and tag == stat.IO_REPARSE_TAG_MOUNT_POINT
 
 
 def fix_path(path):
