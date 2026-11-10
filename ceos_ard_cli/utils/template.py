@@ -11,6 +11,7 @@ from jinja2 import (
     Undefined,
     nodes,
 )
+from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 from ..schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS
 from .files import fix_path, read_file
@@ -27,7 +28,8 @@ def template_file(input_dir: Path, name: str) -> Path:
 
 def template_environment(input_dir: Path, strict: bool = False) -> Environment:
     """Templates load from the templates folder of the input directory first, then from the built-in ones."""
-    env = Environment(
+    # The sandbox keeps templates from reaching Python internals or modifying the data
+    env = ImmutableSandboxedEnvironment(
         loader=ChoiceLoader([FileSystemLoader(Path(input_dir) / "templates"), FileSystemLoader(TEMPLATES_DIR)]),
         undefined=StrictUndefined if strict else Undefined,
         block_start_string="~(",

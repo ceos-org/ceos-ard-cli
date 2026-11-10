@@ -142,6 +142,7 @@ A GitHub token can be provided through the `GITHUB_TOKEN` environment variable t
 The layout of the documents is part of the CLI, see the [templates](ceos_ard_cli/templates) folder:
 the Markdown template, the pandoc templates for HTML and Word, the header and footer of the PDF and the pandoc Lua filters.
 A file with the same name in the `templates` folder of the input directory replaces the built-in one.
+The Markdown template is rendered in Jinja's sandbox, so it can't reach Python internals or change the data.
 
 The texts that all PFSes share are read from Markdown files in `sections/document` of the input directory:
 
