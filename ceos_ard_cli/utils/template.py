@@ -18,6 +18,7 @@ from .files import fix_path, read_file
 from .requirement import slugify
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
+FILTERS_DIR = Path(__file__).parent.parent / "filters"
 
 
 def template_file(input_dir: Path, name: str) -> Path:

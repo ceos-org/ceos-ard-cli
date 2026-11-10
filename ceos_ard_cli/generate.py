@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 from .changelog import DEFAULT_GITHUB_REPO
 from .compile import compile
 from .utils.files import read_file
-from .utils.template import template_file
+from .utils.template import FILTERS_DIR, template_file
 
 
 def generate_all(
@@ -126,17 +126,16 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
         "pandoc-crossref",  # enable cross-references, must be before -C: https://lierdakil.github.io/pandoc-crossref/#citeproc-and-pandoc-crossref
         "-C",  # enable citation processing
         f"--bibliography={out}.bib",  # bibliography file
+        "-L",
+        str(FILTERS_DIR / "no-sectionnumbers.lua"),  # remove section numbers from reference links
+        "-L",
+        str(FILTERS_DIR / "pagebreak.lua"),  # page breaks
+        "-L",
+        str(FILTERS_DIR / "changelog-table.lua"),  # document history
+        "-L",
+        str(FILTERS_DIR / "toc.lua"),  # table of contents
         f"--template={template_file(input_dir, f'template.{format}')}",
     ]
-
-    filters = [
-        "no-sectionnumbers.lua",  # remove section numbers from reference links
-        "pagebreak.lua",  # page breaks
-        "changelog-table.lua",  # document history tables
-        "toc.lua",  # table of contents
-    ]
-    for name in filters:
-        cmd += ["-L", str(template_file(input_dir, name))]
 
     if format == "html":
         cmd.append("--mathml")
