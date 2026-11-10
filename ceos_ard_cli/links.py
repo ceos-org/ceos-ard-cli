@@ -161,7 +161,7 @@ def resolve_titles(data, input_dir):
                 errors.append(f"Failed to read building block '{ref}' in a title reference: {e}")
             if isinstance(content, dict):
                 # glossary building blocks use 'term' instead of 'title'
-                title = (content.get("title") or content.get("term") or "").strip()
+                title = " ".join(str(content.get("title") or content.get("term") or "").split())
             if content is not None and not title:
                 errors.append(f"Building block '{ref}' in a title reference has no title")
                 title = None

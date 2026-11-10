@@ -14,6 +14,7 @@ from strictyaml import (
 
 from .strictyaml.id_reference import IdReference
 from .strictyaml.markdown import Markdown
+from .strictyaml.single_line import SingleLine
 from .utils.files import fix_path
 
 REFERENCE_PATH = "./references/{id}.bib"
@@ -23,6 +24,8 @@ INTRODUCTION_PATH = "./sections/introduction/{id}.yaml"
 ANNEX_PATH = "./sections/annexes/{id}.yaml"
 REQUIREMENT_CATEGORY_PATH = "./sections/requirement-categories/{id}.yaml"
 REQUIREMENT_PATH = "./requirements/{id}.yaml"
+DOCUMENT_SECTION_PATH = "./sections/document/{id}.md"
+DOCUMENT_SECTIONS = ["draft", "status", "definition", "introduction"]
 
 
 _REFS = lambda path, base_path, schema=None, resolve=False: (
@@ -89,7 +92,7 @@ _CHANGES = EmptyList() | Seq(
 GLOSSARY = lambda file, base_path: Map(
     {
         Optional("filepath", default=fix_path(file)): Str(),
-        "term": Str(),
+        "term": SingleLine(),
         "description": Markdown(),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("changes", default=[]): _CHANGES,
@@ -103,7 +106,7 @@ SECTION = lambda file, base_path: Map(
     {
         Optional("filepath", default=fix_path(file)): Str(),
         Optional("id", default=""): Str(),
-        "title": Str(),
+        "title": SingleLine(),
         "description": Markdown(),
         Optional("dependencies", default={}): _REQUIREMENT_DEPS(base_path),
         Optional("sections", default={}): _SECTION_DEPS(base_path),
@@ -117,7 +120,7 @@ SECTION = lambda file, base_path: Map(
 
 PARTIAL_SECTION = lambda file, base_path: Map(
     {
-        Optional("title"): Str(),
+        Optional("title"): SingleLine(),
         Optional("description"): Markdown(),
         Optional("dependencies"): _REQUIREMENT_DEPS(base_path),
         Optional("sections"): _SECTION_DEPS(base_path),
@@ -131,7 +134,7 @@ REQUIREMENT = lambda file, base_path: Map(
     {
         Optional("filepath", default=fix_path(file)): Str(),
         "id": Str(),
-        "title": Str(),
+        "title": SingleLine(),
         Optional("description", default=""): Markdown(),
         "requirements": MapPattern(Str(), _REQUIREMENT_PART),
         Optional("dependencies", default={}): _REQUIREMENT_DEPS(base_path),
@@ -147,7 +150,7 @@ REQUIREMENT = lambda file, base_path: Map(
 
 PARTIAL_REQUIREMENT = lambda file, base_path: Map(
     {
-        Optional("title"): Str(),
+        Optional("title"): SingleLine(),
         Optional("description"): Markdown(),
         Optional("requirements"): MapPattern(Str(), _REQUIREMENT_PART_OVERRIDE),
         Optional("dependencies"): _REQUIREMENT_DEPS(base_path),
@@ -161,14 +164,14 @@ PARTIAL_REQUIREMENT = lambda file, base_path: Map(
 
 PFS_DOCUMENT = lambda file, base_path: Map(
     {
-        "title": Str(),
-        "version": Str(),
-        "type": Str(),
+        "title": SingleLine(),
+        "version": SingleLine(),
+        "type": SingleLine(),
         Optional("applies_to", default=""): Markdown(),
         Optional("background", default=""): Markdown(),
         Optional("dependencies", default={}): _REQUIREMENT_DEPS(base_path),
         Optional("sections", default={}): _SECTION_DEPS(base_path),
-        "authors": Markdown() | Seq(Str()),
+        "authors": Markdown() | Seq(SingleLine()),
         "introduction": _RESOLVED_SECTIONS(INTRODUCTION_PATH, base_path),
         "requirements": EmptyList()
         | Seq(

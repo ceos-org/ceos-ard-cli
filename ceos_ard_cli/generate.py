@@ -7,6 +7,7 @@ from playwright.sync_api import sync_playwright
 from .changelog import DEFAULT_GITHUB_REPO
 from .compile import compile
 from .utils.files import read_file
+from .utils.template import template_file
 
 
 def generate_all(
@@ -106,8 +107,8 @@ def run_playwright(out: Path, input_dir: Path):
             path=f"{out}.pdf",
             format="A4",
             display_header_footer=True,
-            header_template=read_file(f"{input_dir}/templates/template.header.html"),
-            footer_template=read_file(f"{input_dir}/templates/template.footer.html"),
+            header_template=read_file(template_file(input_dir, "template.header.html")),
+            footer_template=read_file(template_file(input_dir, "template.footer.html")),
         )
         browser.close()
 
@@ -125,24 +126,24 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
         "pandoc-crossref",  # enable cross-references, must be before -C: https://lierdakil.github.io/pandoc-crossref/#citeproc-and-pandoc-crossref
         "-C",  # enable citation processing
         f"--bibliography={out}.bib",  # bibliography file
-        "-L",
-        "templates/no-sectionnumbers.lua",  # remove section numbers from reference links
-        "-L",
-        "templates/pagebreak.lua",  # page breaks
-        f"--template=templates/template.{format}",  # template
+        f"--template={template_file(input_dir, f'template.{format}')}",
     ]
 
-    # optional Lua filters, only used if they are provided by the input directory
-    for name in ["changelog-table.lua", "toc.lua"]:
-        if (Path(input_dir) / "templates" / name).is_file():
-            cmd += ["-L", f"templates/{name}"]
+    filters = [
+        "no-sectionnumbers.lua",  # remove section numbers from reference links
+        "pagebreak.lua",  # page breaks
+        "changelog-table.lua",  # document history tables
+        "toc.lua",  # table of contents
+    ]
+    for name in filters:
+        cmd += ["-L", str(template_file(input_dir, name))]
 
     if format == "html":
         cmd.append("--mathml")
         if self_contained:
             cmd.append("--embed-resources=true")
     elif format == "docx":
-        cmd.append(f"--reference-doc={input_dir}/templates/style.docx")
+        cmd.append(f"--reference-doc={template_file(input_dir, 'style.docx')}")
     else:
         raise ValueError(f"Unsupported format {format}")
 
