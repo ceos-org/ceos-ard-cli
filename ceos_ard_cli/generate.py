@@ -147,4 +147,5 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
     else:
         raise ValueError(f"Unsupported format {format}")
 
-    subprocess.run(cmd, cwd=input_dir)
+    if subprocess.run(cmd, cwd=input_dir).returncode != 0:
+        raise ValueError(f"Generating the {format} file failed")
