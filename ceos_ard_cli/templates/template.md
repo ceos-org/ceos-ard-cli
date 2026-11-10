@@ -247,8 +247,10 @@ Note~( if requirement[type].notes | length > 1)~s~( endif )~:
 
 ~( if combined )~
 See the document history in the separate PFS documents.
-~( elif changelog is none )~
+~( elif changelog is none and not stable )~
 The document history is not included in the draft versions of the document.
+~( elif changelog is none )~
+The document history is not included in this document.
 ~( elif not changelog.versions )~
 ~(   if changelog.first_release )~
 This is the first version of this document.

@@ -1,30 +1,30 @@
 -- See also: https://github.com/lierdakil/pandoc-crossref/issues/230#issuecomment-2677186070
 
-function remove_section_identifiers(str)
-  local parts = {}
-  for part in string.gmatch(str, "[^|]+") do
-      table.insert(parts, part)
+-- pandoc-crossref joins the section numbers and the labels of all parent sections into the link text
+-- (e.g. 1.2.|Category.|Category: Title), which can't be split reliably as titles may contain any character.
+-- So the generated link texts, which end with the label, are replaced with the label of the target section.
+-- The labels start with a | for compatibility with filters that still split the link texts at it.
+local labels = {}
+
+local function collect_labels(header)
+  local label = header.attributes["label"]
+  if header.identifier:match("^sec:") and label then
+    labels[header.identifier] = label
   end
-  return parts[#parts] or str
 end
 
-function Link(el)
-  -- pandoc-crossref adds section identifiers (e.g. A.B.C) in front of the section reference link texts.
-  -- We add a | in front of section labels to be able to remove them.
-  -- This filter splits labels at the | char and returns only the last part for all links that
-  -- start with #sec:, which is the default prefix for section references.
-  if el.target:match("#sec:") then
-    for i, content in ipairs(el.content) do
-      if type(content) == "string" then
-        el.content[i] = remove_section_identifiers(content)
-      elseif content.t == "Str" then
-        content.text = remove_section_identifiers(content.text)
-      end
+local function replace_link_text(link)
+  local label = labels[link.target:match("^#(sec:.+)$")]
+  if label then
+    local text = pandoc.utils.stringify(link.content)
+    if text:sub(-#label) == label then
+      link.content = pandoc.Inlines((label:gsub("^|", "")))
     end
   end
-  return el
+  return link
 end
 
 return {
-  { Link = Link }
+  { Header = collect_labels },
+  { Link = replace_link_text },
 }

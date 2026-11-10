@@ -1,3 +1,6 @@
+import shutil
+import subprocess
+
 import pytest
 from jinja2 import UndefinedError
 
@@ -136,6 +139,14 @@ def test_stable_documents_have_no_draft_section(tmp_path):
     markdown = read_template(tmp_path).render(**context(stable=True, document=read_document_sections(tmp_path)))
 
     assert "Draft Version" not in markdown
+
+
+@pytest.mark.parametrize("stable, draft", [(True, False), (False, True)])
+def test_only_drafts_say_that_drafts_have_no_history(tmp_path, stable, draft):
+    markdown = read_template(tmp_path).render(**context(stable=stable, document=read_document_sections(tmp_path)))
+
+    assert ("not included in the draft versions" in markdown) == draft
+    assert ("not included in this document" in markdown) == (not draft)
 
 
 def test_headings_remain_without_document_sections(tmp_path):
@@ -281,7 +292,7 @@ def test_table_cells_escape_pipes(tmp_path):
 
     markdown = read_template(tmp_path).render(**data, document=read_document_sections(tmp_path))
 
-    assert "| `x` | Spatial \| Spectral |" in markdown
+    assert r"| `x` | Spatial \| Spectral |" in markdown
 
 
 @pytest.mark.parametrize(
@@ -303,3 +314,18 @@ def test_document_sections_keep_the_indentation_of_their_text(tmp_path):
     file = write(tmp_path / "status.md", "\n## Status\n\n\n    code block\n\nText  \n\n")
 
     assert read_document_section(file)["description"] == "    code block\n\nText"
+
+
+@pytest.mark.skipif(not shutil.which("pandoc-crossref"), reason="requires pandoc and pandoc-crossref")
+def test_section_links_show_the_full_label_of_their_target():
+    markdown = (
+        "---\nlinkReferences: true\nsecPrefixTemplate: $$i$$\n---\n\n"
+        '### Category {#sec:c label="|Category"}\n\n'
+        '#### A|B and C | D {#sec:r label="|Category: A|B and C | D"}\n\n'
+        "See @sec:r, @sec:c and [custom text](#sec:c).\n"
+    )
+    cmd = ["pandoc", "-F", "pandoc-crossref", "-L", str(TEMPLATES_DIR / "no-sectionnumbers.lua"), "-t", "plain"]
+
+    text = subprocess.run(cmd, input=markdown, capture_output=True, text=True, encoding="utf-8", check=True).stdout
+
+    assert "See Category: A|B and C | D, Category and custom text." in text
