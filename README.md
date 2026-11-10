@@ -70,6 +70,12 @@ To create a combined PFS, e.g. SAR, the following command can be used:
 
 By default, HTML, PDF, and Word documents are generated.
 Pass `--pdf` to skip the PDF output and/or `--docx` to skip the Word output; the HTML version is always generated.
+A `::: {#toc}` div in the template is replaced by a table of contents.
+
+The built-in pandoc Lua filters cannot be replaced by content, and the Markdown template is rendered in Jinja's sandbox:
+
+- The pandoc Lua filters come with the CLI. Lua filters in the input directory are not used.
+- The Markdown template is rendered in Jinja's sandbox.
 
 Check `ceos-ard generate --help` (or `ceos-ard generate --help`) for more details.
 
@@ -132,7 +138,7 @@ If no release exists on GitHub yet, no document history is generated.
 If versions before the oldest listed version exist (e.g. legacy documents before the first GitHub release), the document history refers to them.
 Combined documents never include a document history.
 
-The history is rendered as a table per version with one row per building block (document first, then sections, requirements and glossary terms in document order), listing its changes from the oldest to the newest and the highest change level. As Markdown tables can't contain lists or multiple paragraphs, the template emits the rows as fenced divs and the pandoc Lua filter `changelog-table.lua` converts them into a table.
+The history is rendered as a table per version with one row per building block (document first, then sections, requirements and glossary terms in document order), listing its changes from the oldest to the newest and the highest change level. As Markdown tables can't contain lists or multiple paragraphs, the template emits the rows as fenced divs and the CLI's pandoc Lua filter `changelog-table.lua` converts them into a table.
 
 The releases are read from the GitHub repository `ceos-org/ceos-ard`, which can be changed with `--github-repo`.
 A GitHub token can be provided through the `GITHUB_TOKEN` environment variable to avoid rate limits.
@@ -140,8 +146,9 @@ A GitHub token can be provided through the `GITHUB_TOKEN` environment variable t
 ## Templates
 
 The layout of the documents is part of the CLI, see the [templates](ceos_ard_cli/templates) folder:
-the Markdown template, the pandoc templates for HTML and Word, the header and footer of the PDF and the pandoc Lua filters.
+the Markdown template, the pandoc templates for HTML and Word, and the header and footer of the PDF.
 A file with the same name in the `templates` folder of the input directory replaces the built-in one.
+The pandoc Lua filters in the [filters](ceos_ard_cli/filters) folder can't be replaced.
 The Markdown template is rendered in Jinja's sandbox, so it can't reach Python internals or change the data.
 
 The texts that all PFSes share are read from Markdown files in `sections/document` of the input directory:

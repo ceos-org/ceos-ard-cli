@@ -6,6 +6,7 @@ from jinja2 import UndefinedError
 
 from ceos_ard_cli.utils.files import fix_path
 from ceos_ard_cli.utils.template import (
+    FILTERS_DIR,
     TEMPLATES_DIR,
     check_template,
     read_document_section,
@@ -22,10 +23,6 @@ BUILT_IN = [
     "style.docx",
     "template.header.html",
     "template.footer.html",
-    "no-sectionnumbers.lua",
-    "pagebreak.lua",
-    "changelog-table.lua",
-    "toc.lua",
 ]
 
 
@@ -64,10 +61,10 @@ def test_built_in_templates_are_used_without_overrides(tmp_path, name):
 
 
 def test_templates_in_the_input_directory_replace_the_built_in_ones(tmp_path):
-    override = write(tmp_path / "templates" / "toc.lua", "-- custom")
+    override = write(tmp_path / "templates" / "template.html", "$body$")
 
-    assert template_file(tmp_path, "toc.lua") == override
-    assert template_file(tmp_path, "pagebreak.lua") == TEMPLATES_DIR / "pagebreak.lua"
+    assert template_file(tmp_path, "template.html") == override
+    assert template_file(tmp_path, "style.docx") == TEMPLATES_DIR / "style.docx"
 
 
 @pytest.mark.parametrize("heading", ["# Document Status", "## Document Status", "### Document Status ##"])
@@ -324,7 +321,7 @@ def test_section_links_show_the_full_label_of_their_target():
         '#### A|B and C | D {#sec:r label="|Category: A|B and C | D"}\n\n'
         "See @sec:r, @sec:c and [custom text](#sec:c).\n"
     )
-    cmd = ["pandoc", "-F", "pandoc-crossref", "-L", str(TEMPLATES_DIR / "no-sectionnumbers.lua"), "-t", "plain"]
+    cmd = ["pandoc", "-F", "pandoc-crossref", "-L", str(FILTERS_DIR / "no-sectionnumbers.lua"), "-t", "plain"]
 
     text = subprocess.run(cmd, input=markdown, capture_output=True, text=True, encoding="utf-8", check=True).stdout
 
