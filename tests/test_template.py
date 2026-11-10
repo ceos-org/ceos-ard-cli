@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess
 
@@ -326,3 +327,20 @@ def test_section_links_show_the_full_label_of_their_target():
     text = subprocess.run(cmd, input=markdown, capture_output=True, text=True, encoding="utf-8", check=True).stdout
 
     assert "See Category: A|B and C | D, Category and custom text." in text
+
+
+def test_templates_are_compiled_once(tmp_path):
+    assert read_template(tmp_path) is read_template(tmp_path)
+    assert read_template(tmp_path, strict=True) is not read_template(tmp_path)
+
+
+def test_changed_templates_are_compiled_again(tmp_path):
+    file = write(tmp_path / "templates" / "template.md", "First")
+    assert read_template(tmp_path).render() == "First"
+
+    file.write_text("Second", encoding="utf-8")
+    # Jinja compares the modification time, which can have a low resolution
+    stat = file.stat()
+    os.utime(file, (stat.st_atime, stat.st_mtime + 10))
+
+    assert read_template(tmp_path).render() == "Second"
