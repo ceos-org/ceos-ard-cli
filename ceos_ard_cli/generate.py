@@ -1,6 +1,7 @@
 import subprocess
 from pathlib import Path
 from typing import Union
+from urllib.parse import quote, unquote, urlsplit
 
 from playwright.sync_api import sync_playwright
 
@@ -8,6 +9,9 @@ from .changelog import DEFAULT_GITHUB_REPO
 from .compile import compile
 from .utils.files import read_file
 from .utils.template import FILTERS_DIR, template_file
+
+# Chromium only gets the output folder, served from an address that doesn't exist
+ORIGIN = "https://ceos-ard.invalid"
 
 
 def generate_all(
@@ -97,12 +101,30 @@ def generate(
         run_playwright(target, input_dir)
 
 
+def local_file(folder: Path, url: str) -> Union[Path, None]:
+    if not url.startswith(f"{ORIGIN}/"):
+        return None
+    file = (folder / unquote(urlsplit(url).path).lstrip("/")).resolve()
+    return file if file.is_relative_to(folder) and file.is_file() else None
+
+
 def run_playwright(out: Path, input_dir: Path):
+    html = Path(f"{out}.html").resolve()
+    folder = html.parent
+
+    def route(route):
+        file = local_file(folder, route.request.url)
+        if file:
+            route.fulfill(path=file)
+        else:
+            route.abort()
+
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page()
-        absolute_path = Path(f"{out}.html").absolute()
-        page.goto(f"file://{absolute_path}")
+        page = browser.new_page(java_script_enabled=False)
+        page.route("**/*", route)
+        # Encoded, so that e.g. a # in the file name isn't read as the start of a fragment
+        page.goto(f"{ORIGIN}/{quote(html.name)}")
         page.pdf(
             path=f"{out}.pdf",
             format="A4",

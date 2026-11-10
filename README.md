@@ -72,10 +72,11 @@ By default, HTML, PDF, and Word documents are generated.
 Pass `--pdf` to skip the PDF output and/or `--docx` to skip the Word output; the HTML version is always generated.
 A `::: {#toc}` div in the template is replaced by a table of contents.
 
-The built-in pandoc Lua filters cannot be replaced by content, and the Markdown template is rendered in Jinja's sandbox:
+To limit what the content can do while the documents are generated:
 
 - The pandoc Lua filters come with the CLI. Lua filters in the input directory are not used.
 - The Markdown template is rendered in Jinja's sandbox.
+- Chromium renders the PDF without JavaScript and only loads files from the output directory.
 
 Check `ceos-ard generate --help` (or `ceos-ard generate --help`) for more details.
 
