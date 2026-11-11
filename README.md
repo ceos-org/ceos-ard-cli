@@ -72,10 +72,11 @@ By default, HTML, PDF, and Word documents are generated.
 Pass `--pdf` to skip the PDF output and/or `--docx` to skip the Word output; the HTML version is always generated.
 A `::: {#toc}` div in the template is replaced by a table of contents of the headings that follow it.
 
-Links in the content must use one of the schemes `http`, `https`, `mailto`, `ftp`, `ftps`, `sftp` and `s3`,
-point to an anchor (e.g. `#sec:x`), or point to an existing file in the `assets` folder,
-which is the only folder that is published with the documents.
-Other links, e.g. `www.example.com` without `https://`, fail the generation.
+Links in the content and in the bibliography (e.g. from `url` fields) must use one of the schemes
+`http`, `https`, `mailto`, `ftp`, `ftps`, `sftp` and `s3`, point to an anchor (e.g. `#sec:x`),
+or point to an existing file in the `assets` folder, which is the only folder that is published with the documents.
+Images must be existing files in the `assets` folder.
+Other links and images, e.g. `www.example.com` without `https://`, fail the generation with a list of all of them.
 
 To limit what the content can do while the documents are generated:
 
@@ -104,7 +105,8 @@ To validate (most of) the building blocks, run:
 - With Pixi: `ceos-ard validate`
 - With traditional setup: `ceos-ard validate`
 
-If pandoc is installed, this also checks the links in the content, as `ceos-ard generate` does.
+If pandoc is installed, this also checks the links and images, as `ceos-ard generate` does,
+and names the building block or bibliography entry that each problem is in.
 
 Check `ceos-ard validate --help` (or `ceos-ard validate --help`) for more details.
 

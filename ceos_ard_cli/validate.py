@@ -1,10 +1,11 @@
 import copy
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
-from .compile import read_data, render_markdown
-from .generate import pandoc_error
+from .compile import merge_bibtex, read_data, render_markdown
+from .generate import pandoc_errors
 from .links import resolve_links, resolve_titles
 from .schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS, REQUIREMENT
 from .utils.deprecation import find_deprecated
@@ -12,7 +13,7 @@ from .utils.files import FILE_CACHE, check_no_symlinks, fix_path, get_all_files,
 from .utils.template import FILTERS_DIR, check_template, read_document_section, used_document_sections
 from .utils.yaml import read_yaml
 
-# The filters that `generate` runs to refuse content, see `run_pandoc`
+# The filters that `generate` runs after citeproc to refuse content, see `run_pandoc`
 CHECK_FILTERS = ["links.lua"]
 CHECK_TIMEOUT = 60
 
@@ -22,14 +23,22 @@ def log(id, error=None):
     print(f"- {id}: {message}")
 
 
-def check_content(markdown: str, input_dir: Path) -> str | None:
-    """The problem the check filters find in a document, parsed by pandoc as `generate` does."""
-    cmd = ["pandoc", "-f", "markdown", "-t", "native"]
-    for name in CHECK_FILTERS:
-        cmd += ["-L", str(FILTERS_DIR / name)]
+def check_content(markdown: str, input_dir: Path, bibtex: str = "") -> list[str]:
+    """The problems the check filters find in a document, parsed by pandoc as `generate` does,
+    including the links that citeproc creates from the bibliography."""
+    with tempfile.TemporaryDirectory() as folder:
+        bibliography = Path(folder) / "references.bib"
+        bibliography.write_text(bibtex, encoding="utf-8")
+        args = ["-C", f"--bibliography={bibliography}"]
+        for name in CHECK_FILTERS:
+            args += ["-L", str(FILTERS_DIR / name)]
+        return _run_pandoc(args, markdown, input_dir)
+
+
+def _run_pandoc(args: list[str], markdown: str, input_dir: Path) -> list[str]:
     try:
         result = subprocess.run(
-            cmd,
+            ["pandoc", "-f", "markdown", "-t", "native", *args],
             input=markdown,
             # The filters resolve relative paths from the input folder, as in `generate`
             cwd=input_dir,
@@ -39,16 +48,15 @@ def check_content(markdown: str, input_dir: Path) -> str | None:
             timeout=CHECK_TIMEOUT,
         )
     except subprocess.TimeoutExpired:
-        return f"pandoc took longer than {CHECK_TIMEOUT} seconds"
-    if result.returncode == 0:
-        return None
-    return pandoc_error(result.stderr)
+        return [f"pandoc took longer than {CHECK_TIMEOUT} seconds"]
+    return [] if result.returncode == 0 else pandoc_errors(result.stderr)
 
 
 def check_rendering(data: dict, input_dir: Path) -> list[str]:
     """Render the read-only and the editable document, failing on undefined variables, missing templates and
     content that the check filters refuse."""
     errors = []
+    bibtex = merge_bibtex(data, input_dir)
     for editable in (False, True):
         kind = "editable" if editable else "read-only"
         try:
@@ -57,10 +65,9 @@ def check_rendering(data: dict, input_dir: Path) -> list[str]:
         except Exception as e:
             errors.append(f"template ({kind}): {e}")
             continue
-        if shutil.which("pandoc"):
-            problem = check_content(markdown, input_dir)
-            if problem:
-                errors.append(f"content ({kind}): {problem}")
+        # The editable document has all the content of the read-only one, and names the building blocks
+        if editable and shutil.which("pandoc"):
+            errors += [f"content: {problem}" for problem in check_content(markdown, input_dir, bibtex)]
     return errors
 
 
@@ -114,7 +121,7 @@ def validate(input_dir):
     # This also validates all files that are used/referenced in the PFS
     print("Validating PFS")
     if not shutil.which("pandoc"):
-        print("- pandoc not found: the links in the content are only checked by `generate`")
+        print("- pandoc not found: the links and images in the content are only checked by `generate`")
     input_pfs_folder = input_dir / "pfs"
     all_pfs = get_all_folders(input_pfs_folder)
     for folder in all_pfs:

@@ -11,16 +11,14 @@ from .utils.template import FILTERS_DIR, template_file
 ORIGIN = "https://ceos-ard.invalid"
 
 
-def pandoc_error(stderr: str) -> str:
-    """The reason pandoc failed, without the stack traceback of a filter."""
+def pandoc_errors(stderr: str) -> list[str]:
+    """The reasons pandoc failed, without the stack traceback of a filter: one per line of the filter's message."""
     text = stderr.split("stack traceback:")[0]
     # A filter's own message follows the line that names the filter
     _, found, message = text.partition("Error running filter")
     if found:
-        message = message.partition("\n")[2]
-    else:
-        message = text
-    return " ".join(line.strip() for line in message.splitlines() if line.strip()) or "pandoc failed"
+        return [line.strip() for line in message.partition("\n")[2].splitlines() if line.strip()] or ["pandoc failed"]
+    return [" ".join(line.strip() for line in text.splitlines() if line.strip()) or "pandoc failed"]
 
 
 def generate_all(
@@ -163,12 +161,12 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
         f"{out}.{format}",  # output file
         "-t",
         format,  # output format
-        "-L",
-        str(FILTERS_DIR / "links.lua"),  # refuse broken links, before other filters and citeproc add their own
         "-F",
         "pandoc-crossref",  # enable cross-references, must be before -C: https://lierdakil.github.io/pandoc-crossref/#citeproc-and-pandoc-crossref
         "-C",  # enable citation processing
         f"--bibliography={out}.bib",  # bibliography file
+        "-L",
+        str(FILTERS_DIR / "links.lua"),  # refuse broken links and images, also the ones from the bibliography
         "-L",
         str(FILTERS_DIR / "no-sectionnumbers.lua"),  # remove section numbers from reference links
         "-L",
@@ -192,6 +190,8 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
     # Captured, so that the messages appear in order with the progress and without the filters' stack traces
     result = subprocess.run(cmd, cwd=input_dir, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode != 0:
-        raise ValueError(f"Generating the {format} file failed: {pandoc_error(result.stderr)}")
+        errors = pandoc_errors(result.stderr)
+        details = f" {errors[0]}" if len(errors) == 1 else "".join(f"\n- {error}" for error in errors)
+        raise ValueError(f"Generating the {format} file failed:{details}")
     if result.stderr.strip():
         print(result.stderr.rstrip())

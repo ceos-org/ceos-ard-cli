@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ceos_ard_cli.generate import generate, pandoc_error, run_pandoc
+from ceos_ard_cli.generate import generate, pandoc_errors, run_pandoc
 
 needs_pandoc = pytest.mark.skipif(
     not (shutil.which("pandoc") and shutil.which("pandoc-crossref")), reason="needs pandoc and pandoc-crossref"
@@ -90,25 +90,26 @@ def test_failed_builds_leave_no_files(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize(
-    ("stderr", "message"),
+    ("stderr", "messages"),
     [
         (
             (
                 "Error running filter C:\\cli\\toc.lua:\n\nattempt to index a nil value\n\n"
                 "stack traceback:\n\ttoc.lua:17: in function 'Pandoc'\n"
             ),
-            "attempt to index a nil value",
+            ["attempt to index a nil value"],
         ),
-        ("[WARNING] Something\nError running filter x.lua:\nBroken\n", "Broken"),
+        ("[WARNING] Something\nError running filter x.lua:\nBroken\n", ["Broken"]),
+        ("Error running filter links.lua:\n\na.yaml: First\nb.yaml: Second\n", ["a.yaml: First", "b.yaml: Second"]),
         (
             "Error parsing YAML metadata at doc.md:\nYAML parse exception at line 2\n",
-            "Error parsing YAML metadata at doc.md: YAML parse exception at line 2",
+            ["Error parsing YAML metadata at doc.md: YAML parse exception at line 2"],
         ),
-        ("", "pandoc failed"),
+        ("", ["pandoc failed"]),
     ],
 )
-def test_pandoc_errors_keep_only_the_reason(stderr, message):
-    assert pandoc_error(stderr) == message
+def test_pandoc_errors_keep_only_the_reasons(stderr, messages):
+    assert pandoc_errors(stderr) == messages
 
 
 @pytest.fixture
