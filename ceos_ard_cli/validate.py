@@ -6,7 +6,7 @@ from .links import resolve_links, resolve_titles
 from .schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS, REQUIREMENT
 from .utils.deprecation import find_deprecated
 from .utils.files import FILE_CACHE, check_no_symlinks, fix_path, get_all_files, get_all_folders
-from .utils.template import check_template, read_document_section
+from .utils.template import check_template, read_document_section, used_document_sections
 from .utils.yaml import read_yaml
 
 
@@ -53,6 +53,11 @@ def validate(input_dir):
         log("templates/template.md", error)
 
     print("Validating document sections")
+    try:
+        used = used_document_sections(input_dir)
+    except Exception:
+        # the template check above reports the problem
+        used = set(DOCUMENT_SECTIONS)
     for id in DOCUMENT_SECTIONS:
         path = DOCUMENT_SECTION_PATH.format(id=id)
         file = input_dir / path
@@ -60,8 +65,10 @@ def validate(input_dir):
         try:
             if file.is_file():
                 read_document_section(file)
-            else:
+            elif id in used:
                 error = "missing, its text is left out of the documents"
+            else:
+                error = "missing, not used by the template"
         except Exception as e:
             error = e
         finally:

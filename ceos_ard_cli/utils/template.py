@@ -75,6 +75,35 @@ def read_template(input_dir: Path, strict: bool = False) -> Template:
 def check_template(input_dir: Path) -> None:
     """Parse template.md and every template it includes, imports or extends, also in branches no data reaches."""
     env = template_environment(input_dir)
+    for name, ast in _parsed_templates(env):
+        # compiles it, which catches unknown filters and tests
+        env.compile(ast, name)
+
+
+def used_document_sections(input_dir: Path) -> set[str]:
+    """The ids of the document sections that the templates read, all of them if that can't be determined."""
+    env = template_environment(input_dir)
+    used = set()
+    for _, ast in _parsed_templates(env):
+        accessed = set()
+        for node in ast.find_all((nodes.Getattr, nodes.Getitem)):
+            if isinstance(node.node, nodes.Name) and node.node.name == "document":
+                key = node.attr if isinstance(node, nodes.Getattr) else getattr(node.arg, "value", None)
+                # e.g. document.values() or document[name]
+                if key not in DOCUMENT_SECTIONS:
+                    return set(DOCUMENT_SECTIONS)
+                used.add(key)
+                accessed.add(id(node.node))
+        # `document` passed on as a whole (e.g. to a macro) or a template included by a variable could read any section
+        if any(n.name == "document" and id(n) not in accessed for n in ast.find_all(nodes.Name)):
+            return set(DOCUMENT_SECTIONS)
+        if any(_template_names(n.template) is None for n in ast.find_all(nodes.Include)):
+            return set(DOCUMENT_SECTIONS)
+    return used
+
+
+def _parsed_templates(env: Environment):
+    """template.md and every template it includes, imports or extends, as (name, AST)."""
     pending = ["template.md"]
     checked = set()
     while pending:
@@ -84,8 +113,7 @@ def check_template(input_dir: Path) -> None:
         checked.add(name)
         source = env.loader.get_source(env, name)[0]
         ast = env.parse(source, name)
-        # compiles it, which catches unknown filters and tests
-        env.compile(ast, name)
+        yield name, ast
         for node in ast.find_all((nodes.Include, nodes.Import, nodes.FromImport, nodes.Extends)):
             candidates = _template_names(node.template)
             optional = getattr(node, "ignore_missing", False)

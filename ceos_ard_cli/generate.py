@@ -3,12 +3,24 @@ from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 
 from .changelog import DEFAULT_GITHUB_REPO
-from .compile import compile
+from .compile import compile, remove_outputs
 from .utils.files import read_file
 from .utils.template import FILTERS_DIR, template_file
 
 # Chromium only gets the output folder, served from an address that doesn't exist
 ORIGIN = "https://ceos-ard.invalid"
+
+
+def pandoc_error(stderr: str) -> str:
+    """The reason pandoc failed, without the stack traceback of a filter."""
+    text = stderr.split("stack traceback:")[0]
+    # A filter's own message follows the line that names the filter
+    _, found, message = text.partition("Error running filter")
+    if found:
+        message = message.partition("\n")[2]
+    else:
+        message = text
+    return " ".join(line.strip() for line in message.splitlines() if line.strip()) or "pandoc failed"
 
 
 def generate_all(
@@ -80,22 +92,29 @@ def generate(
         "patch_changes": patch_changes,
     }
 
-    if not no_docx:
-        print("- Generating editable Markdown")
-        target = compile(pfs, output, input_dir, editable=True, **options)
+    target = None
+    try:
+        if not no_docx:
+            print("- Generating editable Markdown")
+            target = compile(pfs, output, input_dir, editable=True, **options)
 
-        print("- Generating Word")
-        run_pandoc(target, "docx", input_dir, self_contained)
+            print("- Generating Word")
+            run_pandoc(target, "docx", input_dir, self_contained)
 
-    print("- Generating read-only Markdown")
-    target = compile(pfs, output, input_dir, editable=False, **options)
+        print("- Generating read-only Markdown")
+        target = compile(pfs, output, input_dir, editable=False, **options)
 
-    print("- Generating HTML")
-    run_pandoc(target, "html", input_dir, self_contained)
+        print("- Generating HTML")
+        run_pandoc(target, "html", input_dir, self_contained)
 
-    if not no_pdf:
-        print("- Generating PDF")
-        run_playwright(target, input_dir)
+        if not no_pdf:
+            print("- Generating PDF")
+            run_playwright(target, input_dir)
+    except Exception:
+        # compile cleans up after its own failures, before the name of the document is known here
+        if target is not None:
+            remove_outputs(target)
+        raise
 
 
 def local_file(folder: Path, url: str) -> Path | None:
@@ -168,5 +187,9 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
     else:
         raise ValueError(f"Unsupported format {format}")
 
-    if subprocess.run(cmd, cwd=input_dir).returncode != 0:
-        raise ValueError(f"Generating the {format} file failed")
+    # Captured, so that the messages appear in order with the progress and without the filters' stack traces
+    result = subprocess.run(cmd, cwd=input_dir, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if result.returncode != 0:
+        raise ValueError(f"Generating the {format} file failed: {pandoc_error(result.stderr)}")
+    if result.stderr.strip():
+        print(result.stderr.rstrip())
