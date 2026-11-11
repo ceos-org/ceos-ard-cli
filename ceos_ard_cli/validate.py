@@ -119,12 +119,13 @@ def validate(input_dir):
     print("Checking for duplicate requirement IDs")
     ids = {}
     for file in all_req_files:
+        # Before reading, so that a file that can't be read is reported under its own name
+        rel_path = file.relative_to(input_dir)
         try:
             data = read_yaml(file, REQUIREMENT, input_dir)
             if not isinstance(data, dict):
                 continue
             req_id = data.get("id")
-            rel_path = file.relative_to(input_dir)
             if not req_id:
                 log(rel_path, "missing id")
                 continue
