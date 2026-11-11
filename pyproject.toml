@@ -9,6 +9,12 @@ requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
@@ -60,15 +66,36 @@ ruff = ">=0.1,<1.0"
 pytest = ">=9.0,<10.0"
 pre-commit = ">=4.0,<=5.0"
 
+# One per supported Python version, for the tests in CI
+[tool.pixi.feature.py311.dependencies]
+python = "3.11.*"
+
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.py313.dependencies]
+python = "3.13.*"
+
+[tool.pixi.feature.py314.dependencies]
+python = "3.14.*"
+
+[tool.pixi.feature.py315.dependencies]
+python = "3.15.*"
+
 [tool.pixi.environments]
 default = {solve-group = "default"}
 dev = {features = ["dev"], solve-group = "default"}
+py311 = ["dev", "py311"]
+py312 = ["dev", "py312"]
+py313 = ["dev", "py313"]
+py314 = ["dev", "py314"]
+py315 = ["dev", "py315"]
 
 [tool.pixi.tasks]
 install-browser = "playwright install chromium --with-deps"
 build = "python -m build"
 format = "ruff format ceos_ard_cli/"
-lint = "ruff check ceos_ard_cli/ --fix --select I"
+lint = "ruff check ceos_ard_cli/ --fix --select I,UP"
 test = "pytest tests/"
 check-all = {depends-on = ["format", "lint", "test"]}
 install-dev = "python -m pip install -e ."

@@ -24,16 +24,21 @@ jobs:
         run: pixi run -e dev format
 
   tests:
-    name: Tests
+    name: Tests (${{ matrix.python-version }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version:
-          - "3.09"
-          - "3.10"
-          - "3.11"
-          - "3.12"
-          - "3.13"
+        include:
+          - python-version: "3.11"
+            environment: py311
+          - python-version: "3.12"
+            environment: py312
+          - python-version: "3.13"
+            environment: py313
+          - python-version: "3.14"
+            environment: py314
+          - python-version: "3.15"
+            environment: py315
       fail-fast: false
     steps:
       - uses: actions/checkout@v7
@@ -41,8 +46,8 @@ jobs:
         with:
           pixi-version: v0.49.0
           cache: true
-          environments: dev
+          environments: ${{ matrix.environment }}
       - name: Install Python dev dependencies
-        run: pixi run -e dev install-dev
+        run: pixi run -e ${{ matrix.environment }} install-dev
       - name: Execute tests
-        run: pixi run -e dev test
+        run: pixi run -e ${{ matrix.environment }} python --version && pixi run -e ${{ matrix.environment }} test

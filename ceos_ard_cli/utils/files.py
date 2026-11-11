@@ -47,7 +47,7 @@ def read_file(file):
     if key in FILE_CACHE:
         return FILE_CACHE[key]
 
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         content = f.read()
         FILE_CACHE[key] = content
         return content

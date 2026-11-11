@@ -2,7 +2,6 @@ import logging
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import Union
 
 from dirsync import sync
 
@@ -355,9 +354,9 @@ def read_data(pfs: list[str], input_dir: Path, stable: bool = False, metadata: d
 
 
 def compile(
-    pfs: Union[list[str], str],
-    out: Union[Path, str],
-    input_dir: Union[Path, str],
+    pfs: list[str] | str,
+    out: Path | str,
+    input_dir: Path | str,
     editable: bool = False,
     stable: bool = False,
     metadata: dict = {},

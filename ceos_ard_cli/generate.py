@@ -1,6 +1,5 @@
 import subprocess
 from pathlib import Path
-from typing import Union
 from urllib.parse import quote, unquote, urlsplit
 
 from .changelog import DEFAULT_GITHUB_REPO
@@ -13,8 +12,8 @@ ORIGIN = "https://ceos-ard.invalid"
 
 
 def generate_all(
-    output: Union[Path, str],
-    input_dir: Union[Path, str],
+    output: Path | str,
+    input_dir: Path | str,
     self_contained: bool = True,
     no_pdf: bool = False,
     no_docx: bool = False,
@@ -56,9 +55,9 @@ def generate_all(
 
 
 def generate(
-    pfs: Union[list[str], str],
-    output: Union[Path, str],
-    input_dir: Union[Path, str],
+    pfs: list[str] | str,
+    output: Path | str,
+    input_dir: Path | str,
     self_contained: bool = True,
     no_pdf: bool = False,
     no_docx: bool = False,
@@ -99,7 +98,7 @@ def generate(
         run_playwright(target, input_dir)
 
 
-def local_file(folder: Path, url: str) -> Union[Path, None]:
+def local_file(folder: Path, url: str) -> Path | None:
     if not url.startswith(f"{ORIGIN}/"):
         return None
     file = (folder / unquote(urlsplit(url).path).lstrip("/")).resolve()
