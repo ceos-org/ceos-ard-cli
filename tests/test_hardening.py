@@ -348,6 +348,34 @@ class TestChromium:
 
 
 @needs_pandoc
+@pytest.mark.parametrize("csp", [True, False])
+def test_html_runs_no_scripts_in_browsers(tmp_path, chromium, csp):
+    from playwright.sync_api import sync_playwright
+
+    # With this class, --embed-resources puts the SVG markup into the HTML, including its scripts and event handlers
+    svg = '<svg xmlns="http://www.w3.org/2000/svg"><script>document.title = "ran"</script><rect onload="x()"/></svg>'
+    write(tmp_path / "assets" / "logo.svg", svg)
+    write(tmp_path / "out" / "doc.md", "---\ntitle: Doc\n---\n\n![logo](assets/logo.svg){.inline-svg}\n")
+    write(tmp_path / "out" / "doc.bib", "")
+    if not csp:
+        # The control: a template without the policy runs the script
+        write(
+            tmp_path / "templates" / "template.html",
+            "<html><head><title>$title$</title></head><body>$body$</body></html>",
+        )
+    run_pandoc(tmp_path / "out" / "doc", "html", tmp_path, self_contained=True)
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.goto((tmp_path / "out" / "doc.html").as_uri())
+        title = page.title()
+        browser.close()
+
+    assert title == ("Doc" if csp else "ran")
+
+
+@needs_pandoc
 class TestPandoc:
     def build(self, tmp_path, markdown):
         write(tmp_path / "templates" / "template.html", "$body$")
