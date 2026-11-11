@@ -19,9 +19,9 @@ jobs:
       - name: Install Python dev dependencies
         run: pixi run -e dev install-dev
       - name: Execute linter
-        run: pixi run -e dev lint
+        run: pixi run -e dev lint-check
       - name: Execute formatter
-        run: pixi run -e dev format
+        run: pixi run -e dev format-check
 
   tests:
     name: Tests (${{ matrix.python-version }})

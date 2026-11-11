@@ -1802,7 +1802,7 @@ packages:
 - pypi: ./
   name: ceos-ard-cli
   version: 0.6.1
-  sha256: cc90702ba5ae4301027f1698a295006e31ac24a4755959f177ee3b5b684fd230
+  sha256: 71bf6ba1d80cb54aae43041e4c87441373e5b3aa007b6b48549ae8f818089712
   requires_dist:
   - bibtexparser==2.0.0b9
   - click>=8.0.0,<9
