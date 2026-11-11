@@ -9,15 +9,20 @@ The Word field is pre-filled with links to the headings, so that Word doesn't
 need to update the fields when opening the document (which shows a prompt).
 The page numbers are added when the field is updated in Word.
 
-The headings from level 2 to `toc-depth` (default: 4) are included.
+The headings from level 2 to `toc-depth` (default: 4) that follow the table of contents are included.
+In Word, they are marked with a bookmark, so that updating the field doesn't add the headings before it.
 ]]
 
 local stringify = pandoc.utils.stringify
 
 local MIN_LEVEL = 2
 local TITLE = "Table of Contents"
--- indentation per level in twips
+-- indentation per level in twips, as in the "toc N" styles of style.docx that Word uses when updating the field
 local INDENT = 360
+-- hidden bookmark (leading underscore) around the headings after the table of contents,
+-- its id is far above the ids of the bookmarks that pandoc numbers from 0
+local RANGE_NAME = "_TocRange"
+local RANGE_ID = 999999
 
 local function xml_escape(text)
   return (text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub('"', "&quot;"))
@@ -44,9 +49,9 @@ end
 local function docx_field(headers, max_level)
   local field_begin = string.format(
     '<w:r><w:fldChar w:fldCharType="begin"/></w:r>'
-      .. '<w:r><w:instrText xml:space="preserve">TOC \\o "%d-%d" \\h \\z \\u</w:instrText></w:r>'
+      .. '<w:r><w:instrText xml:space="preserve">TOC \\o "%d-%d" \\h \\z \\u \\b %s</w:instrText></w:r>'
       .. '<w:r><w:fldChar w:fldCharType="separate"/></w:r>',
-    MIN_LEVEL, max_level)
+    MIN_LEVEL, max_level, RANGE_NAME)
   local field_end = '<w:r><w:fldChar w:fldCharType="end"/></w:r>'
 
   local anchors = bookmark_names(headers)
@@ -54,7 +59,8 @@ local function docx_field(headers, max_level)
   for i, header in ipairs(headers) do
     local indent = (header.level - MIN_LEVEL) * INDENT
     paragraphs[#paragraphs + 1] = string.format(
-      '<w:p><w:pPr><w:ind w:left="%d"/></w:pPr>%s<w:hyperlink w:anchor="%s" w:history="1"><w:r><w:t xml:space="preserve">%s</w:t></w:r></w:hyperlink>%s</w:p>',
+      '<w:p><w:pPr><w:pStyle w:val="TOC%d"/><w:ind w:left="%d"/></w:pPr>%s<w:hyperlink w:anchor="%s" w:history="1"><w:r><w:t xml:space="preserve">%s</w:t></w:r></w:hyperlink>%s</w:p>',
+      header.level,
       indent,
       i == 1 and field_begin or "",
       anchors[i],
@@ -68,7 +74,8 @@ local function docx_field(headers, max_level)
   return pandoc.RawBlock("openxml",
     '<w:sdt><w:sdtPr><w:docPartObj><w:docPartGallery w:val="Table of Contents"/><w:docPartUnique/></w:docPartObj></w:sdtPr><w:sdtContent>'
       .. table.concat(paragraphs)
-      .. "</w:sdtContent></w:sdt>")
+      .. "</w:sdtContent></w:sdt>"
+      .. string.format('<w:bookmarkStart w:id="%d" w:name="%s"/>', RANGE_ID, RANGE_NAME))
 end
 
 local function link_list(headers)
@@ -105,9 +112,16 @@ function Pandoc(doc)
   local max_level = tonumber(stringify(doc.meta["toc-depth"] or "")) or 4
 
   local headers = pandoc.List{}
+  local after_toc = false
   doc.blocks:walk{
+    traverse = "topdown",
+    Div = function(div)
+      if div.identifier == "toc" then
+        after_toc = true
+      end
+    end,
     Header = function(header)
-      if header.level >= MIN_LEVEL and header.level <= max_level and header.identifier ~= "" then
+      if after_toc and header.level >= MIN_LEVEL and header.level <= max_level and header.identifier ~= "" then
         headers:insert(header)
       end
     end,
@@ -128,5 +142,8 @@ function Pandoc(doc)
       return pandoc.Div({ title, link_list(headers) }, { id = "toc", class = "toc" })
     end,
   }
+  if FORMAT == "docx" and after_toc then
+    doc.blocks:insert(pandoc.RawBlock("openxml", string.format('<w:bookmarkEnd w:id="%d"/>', RANGE_ID)))
+  end
   return doc
 end
