@@ -429,17 +429,12 @@ def remove_outputs(out: Path | str):
 
 
 def compile_bibtex(data, out, input_dir: Path):
+    write_file(out, merge_bibtex(data, input_dir))
+
+
+def merge_bibtex(data, input_dir: Path) -> str:
     input_dir = Path(input_dir).resolve()
-    references = []
-    # Read references form disk
-    for ref in data["references"]:
-        filepath = content_file(input_dir, REFERENCE_PATH.format(id=ref))
-        bibtex = read_file(filepath)
-        references.append(bibtex)
-    # Merge into a single string
-    merged_bibtex = "\n".join(references)
-    # Write a single bibtex file back to disk
-    write_file(out, merged_bibtex)
+    return "\n".join(read_file(content_file(input_dir, REFERENCE_PATH.format(id=ref))) for ref in data["references"])
 
 
 # Note: This function is not used for the append/replace functionality
