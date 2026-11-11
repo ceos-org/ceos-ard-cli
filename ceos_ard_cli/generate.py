@@ -3,8 +3,6 @@ from pathlib import Path
 from typing import Union
 from urllib.parse import quote, unquote, urlsplit
 
-from playwright.sync_api import sync_playwright
-
 from .changelog import DEFAULT_GITHUB_REPO
 from .compile import compile
 from .utils.files import read_file
@@ -109,6 +107,9 @@ def local_file(folder: Path, url: str) -> Union[Path, None]:
 
 
 def run_playwright(out: Path, input_dir: Path):
+    # Only loaded for PDFs, as it takes a while
+    from playwright.sync_api import sync_playwright
+
     html = Path(f"{out}.html").resolve()
     folder = html.parent
 
