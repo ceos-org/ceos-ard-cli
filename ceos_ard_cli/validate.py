@@ -30,14 +30,10 @@ def check_content(markdown: str, input_dir: Path, bibtex: str = "") -> list[str]
     with tempfile.TemporaryDirectory() as folder:
         bibliography = Path(folder) / "references.bib"
         bibliography.write_text(bibtex, encoding="utf-8")
-        before = [arg for name in SANITIZE_FILTERS for arg in ("-L", str(FILTERS_DIR / name))]
-        after = ["-C", f"--bibliography={bibliography}"]
-        after += [arg for name in CHECK_FILTERS for arg in ("-L", str(FILTERS_DIR / name))]
-        problems = _run_pandoc(before + after, markdown, input_dir)
-        if problems:
-            # pandoc stops at the first filter that fails, so the checks after citeproc run again on their own
-            problems += _run_pandoc(after, markdown, input_dir)
-    return list(dict.fromkeys(problems))
+        args = [arg for name in SANITIZE_FILTERS for arg in ("-L", str(FILTERS_DIR / name))]
+        args += ["-C", f"--bibliography={bibliography}"]
+        args += [arg for name in CHECK_FILTERS for arg in ("-L", str(FILTERS_DIR / name))]
+        return _run_pandoc(args, markdown, input_dir)
 
 
 def _run_pandoc(args: list[str], markdown: str, input_dir: Path) -> list[str]:

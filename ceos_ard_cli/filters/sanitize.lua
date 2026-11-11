@@ -6,7 +6,9 @@ files from anywhere into the documents, and metadata can make it read files or i
 raw output. Raw output and most attributes also only work in some of the formats.
 
 Runs before all other filters, so it only sees the content, not the raw output and the
-attributes that the other filters and citeproc create on purpose.
+attributes that the other filters and citeproc create on purpose. It removes what it
+refuses, so that nothing of it reaches the other filters and citeproc, and saves the
+problems for links.lua, which reports them together with its own.
 ]]
 
 local problems = dofile(pandoc.path.join({ pandoc.path.directory(PANDOC_SCRIPT_FILE), "problems.lua" }))
@@ -24,16 +26,29 @@ local function check_attributes(el)
   for _, key in ipairs(keys) do
     if not ATTRIBUTES[key:lower()] then
       problems.add("The attribute '" .. key .. "' is not allowed")
+      el.attributes[key] = nil
     end
   end
+  return el
+end
+
+-- A single complete comment, e.g. the template's <!-- edit:pfs/x/document.yaml --> markers.
+-- Raw fences and inlines keep their text as is, so it could continue after the first comment.
+local function is_comment(text)
+  local inner = text:match("^<!%-%-(.*)%-%->$")
+  -- Browsers end a comment at the first --> or --!>, and right away after <!--> or <!--->
+  return inner ~= nil
+    and not inner:find("-->", 1, true)
+    and not inner:find("--!>", 1, true)
+    and not inner:match("^%-?>")
 end
 
 local function check_raw(el)
-  -- The template marks the editable building blocks with comments, e.g. <!-- edit:pfs/x/document.yaml -->.
-  -- pandoc ends a comment at its first -->, anything after it is another raw element.
-  if not (el.format:match("^html") and el.text:match("^<!%-%-.*%-%->$")) then
-    problems.add("Raw " .. el.format .. " is not allowed: " .. el.text:sub(1, 60))
+  if el.format:match("^html") and is_comment(el.text) then
+    return nil
   end
+  problems.add("Raw " .. el.format .. " is not allowed: " .. el.text:sub(1, 60))
+  return {}
 end
 
 local function check_meta(meta)
@@ -50,8 +65,10 @@ local function check_meta(meta)
   for _, key in ipairs(keys) do
     if not allowed[key] then
       problems.add("The metadata '" .. key .. "' is not allowed")
+      meta[key] = nil
     end
   end
+  return meta
 end
 
 return {
@@ -69,5 +86,5 @@ return {
     Table = check_attributes,
     Figure = check_attributes,
   }),
-  problems.report,
+  problems.save,
 }

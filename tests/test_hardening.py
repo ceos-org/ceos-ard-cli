@@ -148,6 +148,12 @@ class TestContent:
             ("<!-- x --><script>alert(1)</script>", "Raw html is not allowed"),
             ("Text <!-- x --><b>y</b><!-- z -->", "Raw html is not allowed: <b>"),
             ("<!-- a --> <img src=../secret.png> <!-- b -->", "Raw html is not allowed: <img"),
+            # Raw fences and inlines keep their text as is, so it can continue after the first comment
+            ("```{=html}\n<!-- a --><img src=../secret.png><!-- b -->\n```", "Raw html is not allowed: <!-- a -->"),
+            ("`<!-- a --><img src=../secret.png><!-- b -->`{=html}", "Raw html is not allowed: <!-- a -->"),
+            ("`<!-- a --!><img src=../secret.png> -->`{=html}", "Raw html is not allowed: <!-- a --!>"),
+            ("`<!--><img src=../secret.png>-->`{=html}", "Raw html is not allowed: <!--><img"),
+            ("`<!---><img src=../secret.png>-->`{=html}", "Raw html is not allowed: <!---><img"),
             ("```{=html}\n<b>x</b>\n```", "Raw html is not allowed"),
             ("`<b>x</b>`{=html}", "Raw html is not allowed"),
             ("Text\n    <b>continued paragraph, not code</b>", "Raw html is not allowed"),
@@ -185,6 +191,29 @@ class TestContent:
         assert check_content(markdown, folder) == ["The metadata 'subtitle' is not allowed"]
         write(folder / "templates" / "template.md", "---\ntitle: x\n# a comment\nsubtitle: >-\n  y\n---\n\nz")
         assert check_content(markdown, folder) == ["The metadata 'nocite' is not allowed"]
+
+    def test_allows_quoted_metadata_keys_of_the_template(self, folder):
+        write(folder / "templates" / "template.md", "---\n'title': x\n\"nocite\": y\n'it''s': z\n---\n\nz")
+        markdown = "---\ntitle: T\nnocite: '@*'\nit's: S\n---\n\nx"
+        assert check_content(markdown, folder) == []
+
+    def test_refused_metadata_never_reaches_citeproc(self, folder):
+        # citeproc would fail to read the style, or fetch it from a URL
+        markdown = "---\ncsl: missing.csl\nnocite: '@*'\n---\n\nSee [@a].\n"
+        assert check_content(markdown, folder, "@misc{a, title={A}}\n") == ["The metadata 'csl' is not allowed"]
+
+    def test_content_cant_add_problems_of_its_own(self, folder):
+        markdown = "---\nceos-ard-problems: [fake]\n---\n\nx"
+        assert check_content(markdown, folder) == ["The metadata 'ceos-ard-problems' is not allowed"]
+
+    def test_lists_its_problems_with_the_ones_of_the_links(self, folder):
+        markdown = "## <!-- edit:a.yaml -->A\n\n[x]{style=x} ![y](../outside.png) <b>z</b>\n"
+        assert check_content(markdown, folder) == [
+            "a.yaml: The attribute 'style' is not allowed",
+            "a.yaml: Raw html is not allowed: <b>",
+            "a.yaml: Raw html is not allowed: </b>",
+            "a.yaml: Images must be files in the assets folder, found '../outside.png'",
+        ]
 
 
 @pytest.fixture(scope="module")
@@ -336,11 +365,12 @@ class TestPandoc:
 
     def test_lists_all_problems(self, tmp_path):
         with pytest.raises(ValueError) as error:
-            self.build(tmp_path, "<!-- edit:a.yaml -->\n\n[x]{style=x} [y]{onclick=y}\n")
+            self.build(tmp_path, "<!-- edit:a.yaml -->\n\n[x]{style=x} [y]{onclick=y} ![z](../outside.png)\n")
         assert str(error.value) == (
             "Generating the html file failed:\n"
             "- a.yaml: The attribute 'style' is not allowed\n"
-            "- a.yaml: The attribute 'onclick' is not allowed"
+            "- a.yaml: The attribute 'onclick' is not allowed\n"
+            "- a.yaml: Images must be files in the assets folder, found '../outside.png'"
         )
 
     def test_keeps_editor_comments_and_local_images(self, tmp_path):

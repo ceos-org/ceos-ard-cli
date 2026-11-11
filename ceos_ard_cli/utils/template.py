@@ -32,7 +32,11 @@ def template_metadata_keys(input_dir: Path) -> list[str]:
     """The top-level keys of the front matter of template.md, read before rendering, so the content can't add any."""
     source = read_file(template_file(input_dir, "template.md"))
     match = re.match(r"---[ \t]*\r?\n(.*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)", source, re.S)
-    return re.findall(r"^([A-Za-z_][\w.-]*)[ \t]*:", match.group(1), re.M) if match else []
+    if not match:
+        return []
+    # Plain, 'single-quoted' (with '' for ') and "double-quoted" keys
+    keys = re.findall(r"""^(?:([A-Za-z_][\w.-]*)|'((?:[^']|'')*)'|"((?:[^"\\]|\\.)*)")[ \t]*:""", match.group(1), re.M)
+    return [plain or single.replace("''", "'") or double for plain, single, double in keys]
 
 
 def template_environment(input_dir: Path, strict: bool = False) -> Environment:
