@@ -1,13 +1,20 @@
 import copy
+import shutil
+import subprocess
 from pathlib import Path
 
 from .compile import read_data, render_markdown
+from .generate import pandoc_error
 from .links import resolve_links, resolve_titles
 from .schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS, REQUIREMENT
 from .utils.deprecation import find_deprecated
 from .utils.files import FILE_CACHE, check_no_symlinks, fix_path, get_all_files, get_all_folders
-from .utils.template import check_template, read_document_section, used_document_sections
+from .utils.template import FILTERS_DIR, check_template, read_document_section, used_document_sections
 from .utils.yaml import read_yaml
+
+# The filters that `generate` runs to refuse content, see `run_pandoc`
+CHECK_FILTERS = ["links.lua"]
+CHECK_TIMEOUT = 60
 
 
 def log(id, error=None):
@@ -15,16 +22,45 @@ def log(id, error=None):
     print(f"- {id}: {message}")
 
 
+def check_content(markdown: str, input_dir: Path) -> str | None:
+    """The problem the check filters find in a document, parsed by pandoc as `generate` does."""
+    cmd = ["pandoc", "-f", "markdown", "-t", "native"]
+    for name in CHECK_FILTERS:
+        cmd += ["-L", str(FILTERS_DIR / name)]
+    try:
+        result = subprocess.run(
+            cmd,
+            input=markdown,
+            # The filters resolve relative paths from the input folder, as in `generate`
+            cwd=input_dir,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=CHECK_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        return f"pandoc took longer than {CHECK_TIMEOUT} seconds"
+    if result.returncode == 0:
+        return None
+    return pandoc_error(result.stderr)
+
+
 def check_rendering(data: dict, input_dir: Path) -> list[str]:
-    """Render the read-only and the editable document, failing on undefined variables and missing templates."""
+    """Render the read-only and the editable document, failing on undefined variables, missing templates and
+    content that the check filters refuse."""
     errors = []
     for editable in (False, True):
+        kind = "editable" if editable else "read-only"
         try:
             # Rendering changes the data, and copying it is much faster than reading it again
-            render_markdown(copy.deepcopy(data), editable, input_dir, strict=True)
+            markdown = render_markdown(copy.deepcopy(data), editable, input_dir, strict=True)
         except Exception as e:
-            kind = "editable" if editable else "read-only"
             errors.append(f"template ({kind}): {e}")
+            continue
+        if shutil.which("pandoc"):
+            problem = check_content(markdown, input_dir)
+            if problem:
+                errors.append(f"content ({kind}): {problem}")
     return errors
 
 
@@ -77,6 +113,8 @@ def validate(input_dir):
     # Validate all PFS
     # This also validates all files that are used/referenced in the PFS
     print("Validating PFS")
+    if not shutil.which("pandoc"):
+        print("- pandoc not found: the links in the content are only checked by `generate`")
     input_pfs_folder = input_dir / "pfs"
     all_pfs = get_all_folders(input_pfs_folder)
     for folder in all_pfs:

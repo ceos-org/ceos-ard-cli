@@ -163,6 +163,8 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
         f"{out}.{format}",  # output file
         "-t",
         format,  # output format
+        "-L",
+        str(FILTERS_DIR / "links.lua"),  # refuse broken links, before other filters and citeproc add their own
         "-F",
         "pandoc-crossref",  # enable cross-references, must be before -C: https://lierdakil.github.io/pandoc-crossref/#citeproc-and-pandoc-crossref
         "-C",  # enable citation processing
