@@ -344,3 +344,13 @@ def test_changed_templates_are_compiled_again(tmp_path):
     os.utime(file, (stat.st_atime, stat.st_mtime + 10))
 
     assert read_template(tmp_path).render() == "Second"
+
+
+def test_overrides_added_or_removed_later_are_used(tmp_path):
+    assert "Contributing Authors" in read_template(tmp_path).render(**context(document={}))
+
+    override = write(tmp_path / "templates" / "template.md", "Override")
+    assert read_template(tmp_path).render() == "Override"
+
+    override.unlink()
+    assert "Contributing Authors" in read_template(tmp_path).render(**context(document={}))

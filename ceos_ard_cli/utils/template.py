@@ -30,12 +30,19 @@ def template_file(input_dir: Path, name: str) -> Path:
 
 def template_environment(input_dir: Path, strict: bool = False) -> Environment:
     """Templates load from the templates folder of the input directory first, then from the built-in ones."""
-    # Shared, so that each template is compiled once; Jinja recompiles templates whose files changed
-    return _template_environment(Path(input_dir), strict)
+    # Shared, so that each template is compiled once; Jinja recompiles templates whose files changed,
+    # but doesn't notice an override that was added or removed, so the overrides are part of the key
+    templates = Path(input_dir) / "templates"
+    overrides = (
+        frozenset(p.relative_to(templates).as_posix() for p in templates.rglob("*"))
+        if templates.is_dir()
+        else frozenset()
+    )
+    return _template_environment(Path(input_dir), strict, overrides)
 
 
 @cache
-def _template_environment(input_dir: Path, strict: bool) -> Environment:
+def _template_environment(input_dir: Path, strict: bool, overrides: frozenset) -> Environment:
     # The sandbox keeps templates from reaching Python internals or modifying the data
     env = ImmutableSandboxedEnvironment(
         loader=ChoiceLoader([FileSystemLoader(input_dir / "templates"), FileSystemLoader(TEMPLATES_DIR)]),
