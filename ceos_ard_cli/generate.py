@@ -188,7 +188,7 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
     ]
 
     if format == "html":
-        cmd.append("--mathml")
+        cmd.append("--math-method=mathml")
         if self_contained:
             cmd.append("--embed-resources=true")
     elif format == "docx":
