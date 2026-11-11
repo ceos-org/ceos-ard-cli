@@ -29,8 +29,9 @@ local function check_attributes(el)
 end
 
 local function check_raw(el)
-  -- The template marks the editable building blocks with comments, e.g. <!-- edit:pfs/x/document.yaml -->
-  if not (el.format:match("^html") and el.text:match("^<!%-%-[^<>]*%-%->$")) then
+  -- The template marks the editable building blocks with comments, e.g. <!-- edit:pfs/x/document.yaml -->.
+  -- pandoc ends a comment at its first -->, anything after it is another raw element.
+  if not (el.format:match("^html") and el.text:match("^<!%-%-.*%-%->$")) then
     problems.add("Raw " .. el.format .. " is not allowed: " .. el.text:sub(1, 60))
   end
 end

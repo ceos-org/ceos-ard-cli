@@ -121,6 +121,7 @@ class TestContent:
         "text",
         [
             "## <!-- edit:sections/document/status.md -->Status\n\n<!-- edit:glossary/a.yaml -->\nTerm",
+            '<!-- a < b -->\n\nText <!-- example: <img src="logo.png"> --> and <!--\nmore\nlines\n-->.',
             "Plain text with **bold** and a [link](https://ceos.org) and <https://ceos.org>.",
             "Less than: a < b and 5<6.",
             "```xml\n<band name='x'>\n```",
@@ -145,6 +146,8 @@ class TestContent:
             ("An <iframe src='file:///etc/passwd'>", "Raw html is not allowed"),
             ("<img src=x onerror=alert(1)/>", "Raw html is not allowed"),
             ("<!-- x --><script>alert(1)</script>", "Raw html is not allowed"),
+            ("Text <!-- x --><b>y</b><!-- z -->", "Raw html is not allowed: <b>"),
+            ("<!-- a --> <img src=../secret.png> <!-- b -->", "Raw html is not allowed: <img"),
             ("```{=html}\n<b>x</b>\n```", "Raw html is not allowed"),
             ("`<b>x</b>`{=html}", "Raw html is not allowed"),
             ("Text\n    <b>continued paragraph, not code</b>", "Raw html is not allowed"),
