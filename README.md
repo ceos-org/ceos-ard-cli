@@ -83,8 +83,14 @@ To limit what the content can do while the documents are generated:
 
 - The pandoc Lua filters come with the CLI. Lua filters in the input directory are not used.
 - The Markdown template is rendered in Jinja's sandbox.
+- Raw HTML and other raw output (e.g. ` ```{=html} `) is refused, except for HTML comments.
+- Only the attributes `width` and `height` (e.g. `{width=50%}` on an image), which work in all formats,
+  and `label`, `columns` and `widths`, which the template uses, are allowed.
+- Only the metadata of the front matter of `template.md` is allowed, so the content can't add any, e.g. `css`.
 - IDs and `@title:` references must point to files inside the input directory, and symbolic links are refused.
 - Chromium renders the PDF without JavaScript and only loads files from the output directory.
+
+The HTML, Word and PDF templates that replace the built-in ones from the input directory are trusted and not checked.
 
 Check `ceos-ard generate --help` (or `ceos-ard generate --help`) for more details.
 
@@ -106,7 +112,8 @@ To validate (most of) the building blocks, run:
 - With Pixi: `ceos-ard validate`
 - With traditional setup: `ceos-ard validate`
 
-If pandoc is installed, this also checks the links and images, as `ceos-ard generate` does.
+If pandoc is installed, this also checks the content (raw HTML, attributes, metadata, links and images),
+as `ceos-ard generate` does.
 
 Check `ceos-ard validate --help` (or `ceos-ard validate --help`) for more details.
 
@@ -170,7 +177,8 @@ The texts that all PFSes share are read from Markdown files in `sections/documen
 - `introduction.md`: the introduction before the introductory sections of the PFS
 
 Each file starts with a heading (of any level), which becomes the section title, followed by plain Markdown.
-The texts can't use template variables. A missing file leaves its text out of the documents.
+The texts can't use template variables and follow the same rules as the Markdown in the YAML files, e.g. no raw HTML.
+A missing file leaves its text out of the documents.
 
 ## Development
 

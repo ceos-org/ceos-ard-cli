@@ -2,7 +2,5 @@ import strictyaml
 
 
 class Markdown(strictyaml.Str):
-    def validate_scalar(self, chunk):
-        # ToDo: Validate markdown
-
-        return super().validate_scalar(chunk)
+    # The content is checked by the sanitize filter, with pandoc's parser, see `ceos-ard validate`
+    pass

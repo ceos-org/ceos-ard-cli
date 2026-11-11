@@ -19,7 +19,7 @@ from ceos_ard_cli.schema import REFERENCE_PATH
 from ceos_ard_cli.strictyaml.id_reference import IdReference
 from ceos_ard_cli.utils import files
 from ceos_ard_cli.utils.files import check_no_symlinks, content_file
-from ceos_ard_cli.validate import validate
+from ceos_ard_cli.validate import check_content, validate
 
 needs_pandoc = pytest.mark.skipif(
     not (shutil.which("pandoc") and shutil.which("pandoc-crossref")), reason="needs pandoc and pandoc-crossref"
@@ -108,6 +108,112 @@ class TestPaths:
     def test_no_symlinks(self, tmp_path):
         write(tmp_path / "assets" / "logo.png", "")
         check_no_symlinks(tmp_path)
+
+
+@pytest.mark.skipif(not shutil.which("pandoc"), reason="needs pandoc")
+class TestContent:
+    @pytest.fixture
+    def folder(self, tmp_path):
+        write(tmp_path / "assets" / "logo.png", "")
+        return tmp_path
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "## <!-- edit:sections/document/status.md -->Status\n\n<!-- edit:glossary/a.yaml -->\nTerm",
+            '<!-- a < b -->\n\nText <!-- example: <img src="logo.png"> --> and <!--\nmore\nlines\n-->.',
+            "Plain text with **bold** and a [link](https://ceos.org) and <https://ceos.org>.",
+            "Less than: a < b and 5<6.",
+            "```xml\n<band name='x'>\n```",
+            "~~~\n<script>\n~~~",
+            "Inline `<b>` code.",
+            "    <band name='x'>",
+            "Some code:\n\n    <band name='x'>\n\n    </band>\n\nAnd text.",
+            "A [heading](#x){.unnumbered} and a [span]{.note}.",
+            "![x](assets/logo.png){#fig:x width=50% height=2cm}",
+            "## A {#sec:a label=x}",
+            "::: {.changelog columns=a|b widths=0.5|0.5}\nx\n:::",
+        ],
+    )
+    def test_allowed(self, folder, text):
+        assert check_content(text, folder) == []
+
+    @pytest.mark.parametrize(
+        ("text", "message"),
+        [
+            ("<script>alert(1)</script>", "Raw html is not allowed"),
+            ("## A <script>alert(1)</script> title", "Raw html is not allowed"),
+            ("An <iframe src='file:///etc/passwd'>", "Raw html is not allowed"),
+            ("<img src=x onerror=alert(1)/>", "Raw html is not allowed"),
+            ("<!-- x --><script>alert(1)</script>", "Raw html is not allowed"),
+            ("Text <!-- x --><b>y</b><!-- z -->", "Raw html is not allowed: <b>"),
+            ("<!-- a --> <img src=../secret.png> <!-- b -->", "Raw html is not allowed: <img"),
+            # Raw fences and inlines keep their text as is, so it can continue after the first comment
+            ("```{=html}\n<!-- a --><img src=../secret.png><!-- b -->\n```", "Raw html is not allowed: <!-- a -->"),
+            ("`<!-- a --><img src=../secret.png><!-- b -->`{=html}", "Raw html is not allowed: <!-- a -->"),
+            ("`<!-- a --!><img src=../secret.png> -->`{=html}", "Raw html is not allowed: <!-- a --!>"),
+            ("`<!--><img src=../secret.png>-->`{=html}", "Raw html is not allowed: <!--><img"),
+            ("`<!---><img src=../secret.png>-->`{=html}", "Raw html is not allowed: <!---><img"),
+            ("```{=html}\n<b>x</b>\n```", "Raw html is not allowed"),
+            ("`<b>x</b>`{=html}", "Raw html is not allowed"),
+            ("Text\n    <b>continued paragraph, not code</b>", "Raw html is not allowed"),
+            ('[click]{onclick="alert(1)"}', "The attribute 'onclick' is not allowed"),
+            ("[x]{style='background: url(/etc/passwd)'}", "The attribute 'style' is not allowed"),
+            ("::: {data-src=/etc/passwd}\nx\n:::", "The attribute 'data-src' is not allowed"),
+            ("![v](assets/logo.png){poster=../secret}", "The attribute 'poster' is not allowed"),
+            ("[x]{lang=de}", "The attribute 'lang' is not allowed"),
+            ("[x]{custom-style=Quote}", "The attribute 'custom-style' is not allowed"),
+            ("---\ncss: /etc/passwd\n---\n\nx", "The metadata 'css' is not allowed"),
+            ("---\nheader-includes: x\n---\n\nx", "The metadata 'header-includes' is not allowed"),
+            ("---\nhighlighting-css: x\n---\n\nx", "The metadata 'highlighting-css' is not allowed"),
+            ("---\ncsl: ../x.csl\n---\n\nx", "The metadata 'csl' is not allowed"),
+        ],
+    )
+    def test_refused(self, folder, text, message):
+        assert any(message in problem for problem in check_content(text, folder))
+
+    def test_reports_all_problems_with_their_building_blocks(self, folder):
+        markdown = (
+            "## <!-- edit:requirements/a.yaml -->A {onclick=x}\n\n<b>x</b> [x](htps://x.org)\n\n"
+            "<!-- edit:glossary/b.yaml -->\nTerm\n:   ![x](../outside.png)\n"
+        )
+        assert check_content(markdown, folder) == [
+            "requirements/a.yaml: The attribute 'onclick' is not allowed",
+            "requirements/a.yaml: Raw html is not allowed: <b>",
+            "requirements/a.yaml: Raw html is not allowed: </b>",
+            "requirements/a.yaml: Links must use one of the schemes http, https, mailto, ftp, ftps, sftp, s3, "
+            "found 'htps://x.org'",
+            "glossary/b.yaml: Images must be files in the assets folder, found '../outside.png'",
+        ]
+
+    def test_allows_the_metadata_of_the_template(self, folder):
+        markdown = "---\ntitle: T\nnocite: '@*'\nsubtitle: S\n---\n\nx"
+        assert check_content(markdown, folder) == ["The metadata 'subtitle' is not allowed"]
+        write(folder / "templates" / "template.md", "---\ntitle: x\n# a comment\nsubtitle: >-\n  y\n---\n\nz")
+        assert check_content(markdown, folder) == ["The metadata 'nocite' is not allowed"]
+
+    def test_allows_quoted_metadata_keys_of_the_template(self, folder):
+        write(folder / "templates" / "template.md", "---\n'title': x\n\"nocite\": y\n'it''s': z\n---\n\nz")
+        markdown = "---\ntitle: T\nnocite: '@*'\nit's: S\n---\n\nx"
+        assert check_content(markdown, folder) == []
+
+    def test_refused_metadata_never_reaches_citeproc(self, folder):
+        # citeproc would fail to read the style, or fetch it from a URL
+        markdown = "---\ncsl: missing.csl\nnocite: '@*'\n---\n\nSee [@a].\n"
+        assert check_content(markdown, folder, "@misc{a, title={A}}\n") == ["The metadata 'csl' is not allowed"]
+
+    def test_content_cant_add_problems_of_its_own(self, folder):
+        markdown = "---\nceos-ard-problems: [fake]\n---\n\nx"
+        assert check_content(markdown, folder) == ["The metadata 'ceos-ard-problems' is not allowed"]
+
+    def test_lists_its_problems_with_the_ones_of_the_links(self, folder):
+        markdown = "## <!-- edit:a.yaml -->A\n\n[x]{style=x} ![y](../outside.png) <b>z</b>\n"
+        assert check_content(markdown, folder) == [
+            "a.yaml: The attribute 'style' is not allowed",
+            "a.yaml: Raw html is not allowed: <b>",
+            "a.yaml: Raw html is not allowed: </b>",
+            "a.yaml: Images must be files in the assets folder, found '../outside.png'",
+        ]
 
 
 @pytest.fixture(scope="module")
@@ -256,3 +362,42 @@ class TestPandoc:
         write(tmp_path / "templates" / "pagebreak.lua", "error('content code ran')")
         write(tmp_path / "templates" / "toc.lua", "error('content code ran')")
         assert "Title" in self.build(tmp_path, "# Title\n")
+
+    def test_lists_all_problems(self, tmp_path):
+        with pytest.raises(ValueError) as error:
+            self.build(tmp_path, "<!-- edit:a.yaml -->\n\n[x]{style=x} [y]{onclick=y} ![z](../outside.png)\n")
+        assert str(error.value) == (
+            "Generating the html file failed:\n"
+            "- a.yaml: The attribute 'style' is not allowed\n"
+            "- a.yaml: The attribute 'onclick' is not allowed\n"
+            "- a.yaml: Images must be files in the assets folder, found '../outside.png'"
+        )
+
+    def test_keeps_editor_comments_and_local_images(self, tmp_path):
+        html = self.build(tmp_path, "<!-- edit:requirements/a.yaml -->\n\n# Title\n\n![logo](assets/logo.png)\n")
+        assert "<!-- edit:requirements/a.yaml -->" in html
+        assert 'src="assets/logo.png"' in html
+
+    @pytest.mark.parametrize(
+        ("markdown", "message"),
+        [
+            ("<script>alert(1)</script>", "Raw html is not allowed"),
+            ("Text <iframe src='/etc/passwd'></iframe>", "Raw html is not allowed"),
+            ("```{=html}\n<b>x</b>\n```", "Raw html is not allowed"),
+            ("<!-- x --><script>alert(1)</script>", "Raw html is not allowed"),
+            ("---\ntitle: <script>alert(1)</script>\n---\n\nx", "Raw html is not allowed"),
+            ("![v](assets/logo.png){poster=../outside.png}", "The attribute 'poster' is not allowed"),
+            ("---\ncss: /etc/passwd\n---\n\nx", "The metadata 'css' is not allowed"),
+            (
+                "---\nheader-includes: <script>alert(1)</script>\n---\n\nx",
+                "The metadata 'header-includes' is not allowed",
+            ),
+            ("[x]{style='background: url(/etc/passwd)'}", "The attribute 'style' is not allowed"),
+            ('[click]{onclick="alert(1)"}', "The attribute 'onclick' is not allowed"),
+            ("::: {data-src=/etc/passwd}\nx\n:::", "The attribute 'data-src' is not allowed"),
+        ],
+    )
+    def test_refuses(self, tmp_path, markdown, message):
+        with pytest.raises(ValueError, match="html file failed") as error:
+            self.build(tmp_path, markdown)
+        assert message in str(error.value)

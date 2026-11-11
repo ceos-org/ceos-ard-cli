@@ -3,12 +3,16 @@ problems – collects the problems that a filter finds, not a filter itself
 
 Each problem names the building block it's in, from the <!-- edit:... --> comments of the
 Markdown, or the bibliography entry, if known. All problems are reported together at the end.
+A filter that runs before others can save its problems instead, so that the last one reports them all.
 
     local problems = dofile(pandoc.path.join({ pandoc.path.directory(PANDOC_SCRIPT_FILE), "problems.lua" }))
     return { problems.filter({ Link = check_link }), problems.report }
 ]]
 
 local M = {}
+
+-- The metadata that carries the saved problems to the filter that reports them
+local SAVED = "ceos-ard-problems"
 
 local found = {}
 local reported = {}
@@ -52,26 +56,39 @@ function M.filter(functions)
     filter[name] = function(el)
       track(el)
       if check then
-        check(el)
+        return check(el)
       end
     end
   end
   for name, check in pairs(functions) do
     if not TRACKERS[name] then
-      filter[name] = function(el)
-        check(el)
-      end
+      filter[name] = check
     end
   end
   return filter
 end
 
+M.save = {
+  Pandoc = function(doc)
+    doc.meta[SAVED] = pandoc.MetaList(found)
+    return doc
+  end,
+}
+
 M.report = {
-  Pandoc = function()
-    if #found == 0 then
-      return
+  Pandoc = function(doc)
+    local all = {}
+    for _, line in ipairs(doc.meta[SAVED] or {}) do
+      table.insert(all, pandoc.utils.stringify(line))
     end
-    error("\n" .. table.concat(found, "\n") .. "\n", 0)
+    for _, line in ipairs(found) do
+      table.insert(all, line)
+    end
+    if #all > 0 then
+      error("\n" .. table.concat(all, "\n") .. "\n", 0)
+    end
+    doc.meta[SAVED] = nil
+    return doc
   end,
 }
 
