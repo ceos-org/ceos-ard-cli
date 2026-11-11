@@ -13,6 +13,8 @@ from .utils.files import check_no_symlinks, content_file, read_file, write_file
 from .utils.pfs import read_pfs
 from .utils.template import read_document_sections, read_template
 
+OUTPUT_EXTENSIONS = [".md", ".bib", ".docx", ".html", ".pdf"]
+
 
 def topological_sort_requirements(
     requirements_by_pfs: list[list[str]], equivalence_groups: dict[str, str] = None
@@ -385,32 +387,45 @@ def compile(
         logger.setLevel(logging.INFO if debug else logging.CRITICAL)
         sync(str(assets_source), str(assets_target), "sync", create=True, purge=True, content=True, logger=logger)
 
-    data = read_data(pfs, input_dir, stable, metadata)
+    data = None
+    try:
+        data = read_data(pfs, input_dir, stable, metadata)
 
-    if stable:
-        out = out.parent / f"{out.stem}-v{data['version']}"
+        if stable:
+            out = out.parent / f"{out.stem}-v{data['version']}"
 
-    # write a json file for debugging
-    if debug:
-        import json
+        # write a json file for debugging
+        if debug:
+            import json
 
-        write_file(f"{out}.debug.json", json.dumps(data, indent=2))
+            write_file(f"{out}.debug.json", json.dumps(data, indent=2))
 
-    # create the markdown file
-    compile_markdown(
-        data,
-        f"{out}.md",
-        editable,
-        input_dir,
-        history=history,
-        github_repo=github_repo,
-        patch_changes=patch_changes,
-        pfs=pfs[0] if len(pfs) == 1 else None,
-    )
-    # write bibtex file to disk
-    compile_bibtex(data, f"{out}.bib", input_dir)
+        # create the markdown file
+        compile_markdown(
+            data,
+            f"{out}.md",
+            editable,
+            input_dir,
+            history=history,
+            github_repo=github_repo,
+            patch_changes=patch_changes,
+            pfs=pfs[0] if len(pfs) == 1 else None,
+        )
+        # write bibtex file to disk
+        compile_bibtex(data, f"{out}.bib", input_dir)
+    except Exception:
+        # Without the data, the name of a stable document isn't known, and the draft's files must stay
+        if data is not None or not stable:
+            remove_outputs(out)
+        raise
 
     return out
+
+
+def remove_outputs(out: Path | str):
+    """Left behind, the files of a failed or an earlier run would look like a result."""
+    for extension in OUTPUT_EXTENSIONS:
+        Path(f"{out}{extension}").unlink(missing_ok=True)
 
 
 def compile_bibtex(data, out, input_dir: Path):

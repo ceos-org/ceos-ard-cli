@@ -3,13 +3,12 @@ from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 
 from .changelog import DEFAULT_GITHUB_REPO
-from .compile import compile
+from .compile import compile, remove_outputs
 from .utils.files import read_file
 from .utils.template import FILTERS_DIR, template_file
 
 # Chromium only gets the output folder, served from an address that doesn't exist
 ORIGIN = "https://ceos-ard.invalid"
-OUTPUT_EXTENSIONS = [".md", ".bib", ".docx", ".html", ".pdf"]
 
 
 def pandoc_error(stderr: str) -> str:
@@ -112,10 +111,9 @@ def generate(
             print("- Generating PDF")
             run_playwright(target, input_dir)
     except Exception:
-        # Left behind, the files of a failed or an earlier run would look like a result
+        # compile cleans up after its own failures, before the name of the document is known here
         if target is not None:
-            for extension in OUTPUT_EXTENSIONS:
-                Path(f"{target}{extension}").unlink(missing_ok=True)
+            remove_outputs(target)
         raise
 
 

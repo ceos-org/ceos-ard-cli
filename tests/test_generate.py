@@ -2,6 +2,7 @@ import importlib
 import re
 import shutil
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -108,3 +109,44 @@ def test_failed_builds_leave_no_files(tmp_path, monkeypatch):
 )
 def test_pandoc_errors_keep_only_the_reason(stderr, message):
     assert pandoc_error(stderr) == message
+
+
+@pytest.fixture
+def failing_compile(tmp_path, monkeypatch):
+    """A compilation that writes the Markdown file and then fails, or fails right away when reading the data."""
+    module = importlib.import_module("ceos_ard_cli.compile")
+    (tmp_path / "assets").mkdir()
+
+    def fail(*args, **kwargs):
+        raise ValueError("broken")
+
+    monkeypatch.setattr(module, "read_data", lambda *args, **kwargs: {"version": "1.0.0"})
+    monkeypatch.setattr(module, "compile_markdown", lambda data, out, *args, **kwargs: write(Path(out), "x"))
+    monkeypatch.setattr(module, "compile_bibtex", fail)
+    return module, fail
+
+
+@pytest.mark.parametrize("stable, name", [(False, "SR"), (True, "SR-v1.0.0")])
+def test_failed_compilations_leave_no_files(tmp_path, failing_compile, stable, name):
+    module, _ = failing_compile
+    out = tmp_path / "out"
+    write(out / "SR.html", "draft")
+    write(out / "SR-v1.0.0.html", "stable")
+    write(out / f"{name}.pdf", "from an earlier run")
+
+    with pytest.raises(ValueError, match="broken"):
+        module.compile("SR", out / "SR", tmp_path, stable=stable)
+
+    remaining = sorted(p.name for p in out.iterdir() if p.is_file())
+    assert remaining == (["SR-v1.0.0.html"] if not stable else ["SR.html"])
+
+
+def test_failed_stable_compilations_keep_all_files_without_a_version(tmp_path, failing_compile, monkeypatch):
+    module, fail = failing_compile
+    monkeypatch.setattr(module, "read_data", fail)
+    write(tmp_path / "out" / "SR.html", "draft")
+
+    with pytest.raises(ValueError, match="broken"):
+        module.compile("SR", tmp_path / "out" / "SR", tmp_path, stable=True)
+
+    assert (tmp_path / "out" / "SR.html").is_file()
