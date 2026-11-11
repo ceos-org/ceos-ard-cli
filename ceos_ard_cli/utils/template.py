@@ -28,6 +28,13 @@ def template_file(input_dir: Path, name: str) -> Path:
     return override if override.is_file() else TEMPLATES_DIR / name
 
 
+def template_metadata_keys(input_dir: Path) -> list[str]:
+    """The top-level keys of the front matter of template.md, read before rendering, so the content can't add any."""
+    source = read_file(template_file(input_dir, "template.md"))
+    match = re.match(r"---[ \t]*\r?\n(.*?)\r?\n(?:---|\.\.\.)[ \t]*(?:\r?\n|$)", source, re.S)
+    return re.findall(r"^([A-Za-z_][\w.-]*)[ \t]*:", match.group(1), re.M) if match else []
+
+
 def template_environment(input_dir: Path, strict: bool = False) -> Environment:
     """Templates load from the templates folder of the input directory first, then from the built-in ones."""
     # Shared, so that each template is compiled once; Jinja recompiles templates whose files changed,

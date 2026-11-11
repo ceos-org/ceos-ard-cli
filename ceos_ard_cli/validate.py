@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 from .compile import merge_bibtex, read_data, render_markdown
-from .generate import pandoc_errors
+from .generate import pandoc_env, pandoc_errors
 from .links import resolve_links, resolve_titles
 from .schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS, REQUIREMENT
 from .utils.deprecation import find_deprecated
@@ -13,7 +13,8 @@ from .utils.files import FILE_CACHE, check_no_symlinks, fix_path, get_all_files,
 from .utils.template import FILTERS_DIR, check_template, read_document_section, used_document_sections
 from .utils.yaml import read_yaml
 
-# The filters that `generate` runs after citeproc to refuse content, see `run_pandoc`
+# The filters that `generate` runs before and after citeproc to refuse content, see `run_pandoc`
+SANITIZE_FILTERS = ["sanitize.lua"]
 CHECK_FILTERS = ["links.lua"]
 CHECK_TIMEOUT = 60
 
@@ -29,10 +30,14 @@ def check_content(markdown: str, input_dir: Path, bibtex: str = "") -> list[str]
     with tempfile.TemporaryDirectory() as folder:
         bibliography = Path(folder) / "references.bib"
         bibliography.write_text(bibtex, encoding="utf-8")
-        args = ["-C", f"--bibliography={bibliography}"]
-        for name in CHECK_FILTERS:
-            args += ["-L", str(FILTERS_DIR / name)]
-        return _run_pandoc(args, markdown, input_dir)
+        before = [arg for name in SANITIZE_FILTERS for arg in ("-L", str(FILTERS_DIR / name))]
+        after = ["-C", f"--bibliography={bibliography}"]
+        after += [arg for name in CHECK_FILTERS for arg in ("-L", str(FILTERS_DIR / name))]
+        problems = _run_pandoc(before + after, markdown, input_dir)
+        if problems:
+            # pandoc stops at the first filter that fails, so the checks after citeproc run again on their own
+            problems += _run_pandoc(after, markdown, input_dir)
+    return list(dict.fromkeys(problems))
 
 
 def _run_pandoc(args: list[str], markdown: str, input_dir: Path) -> list[str]:
@@ -42,6 +47,7 @@ def _run_pandoc(args: list[str], markdown: str, input_dir: Path) -> list[str]:
             input=markdown,
             # The filters resolve relative paths from the input folder, as in `generate`
             cwd=input_dir,
+            env=pandoc_env(input_dir),
             capture_output=True,
             text=True,
             encoding="utf-8",
@@ -121,7 +127,7 @@ def validate(input_dir):
     # This also validates all files that are used/referenced in the PFS
     print("Validating PFS")
     if not shutil.which("pandoc"):
-        print("- pandoc not found: the links and images in the content are only checked by `generate`")
+        print("- pandoc not found: the content is only checked by `generate`")
     input_pfs_folder = input_dir / "pfs"
     all_pfs = get_all_folders(input_pfs_folder)
     for folder in all_pfs:

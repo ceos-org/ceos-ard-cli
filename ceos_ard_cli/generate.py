@@ -1,3 +1,4 @@
+import os
 import subprocess
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
@@ -5,7 +6,7 @@ from urllib.parse import quote, unquote, urlsplit
 from .changelog import DEFAULT_GITHUB_REPO
 from .compile import compile, remove_outputs
 from .utils.files import read_file
-from .utils.template import FILTERS_DIR, template_file
+from .utils.template import FILTERS_DIR, template_file, template_metadata_keys
 
 # Chromium only gets the output folder, served from an address that doesn't exist
 ORIGIN = "https://ceos-ard.invalid"
@@ -19,6 +20,12 @@ def pandoc_errors(stderr: str) -> list[str]:
     if found:
         return [line.strip() for line in message.partition("\n")[2].splitlines() if line.strip()] or ["pandoc failed"]
     return [" ".join(line.strip() for line in text.splitlines() if line.strip()) or "pandoc failed"]
+
+
+def pandoc_env(input_dir: Path) -> dict[str, str]:
+    """The environment for pandoc, with the metadata that the sanitize filter allows."""
+    keys = [*template_metadata_keys(input_dir), "bibliography"]
+    return {**os.environ, "CEOS_ARD_METADATA": ",".join(keys)}
 
 
 def generate_all(
@@ -161,6 +168,8 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
         f"{out}.{format}",  # output file
         "-t",
         format,  # output format
+        "-L",
+        str(FILTERS_DIR / "sanitize.lua"),  # refuse raw output, attributes and metadata, must be first
         "-F",
         "pandoc-crossref",  # enable cross-references, must be before -C: https://lierdakil.github.io/pandoc-crossref/#citeproc-and-pandoc-crossref
         "-C",  # enable citation processing
@@ -188,7 +197,15 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
         raise ValueError(f"Unsupported format {format}")
 
     # Captured, so that the messages appear in order with the progress and without the filters' stack traces
-    result = subprocess.run(cmd, cwd=input_dir, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    result = subprocess.run(
+        cmd,
+        cwd=input_dir,
+        env=pandoc_env(input_dir),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
     if result.returncode != 0:
         errors = pandoc_errors(result.stderr)
         details = f" {errors[0]}" if len(errors) == 1 else "".join(f"\n- {error}" for error in errors)
