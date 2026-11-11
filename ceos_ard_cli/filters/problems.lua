@@ -2,7 +2,7 @@
 problems – collects the problems that a filter finds, not a filter itself
 
 Each problem names the building block it's in, from the <!-- edit:... --> comments of the
-Markdown, or the bibliography entry. All problems are reported together at the end.
+Markdown, or the bibliography entry, if known. All problems are reported together at the end.
 
     local problems = dofile(pandoc.path.join({ pandoc.path.directory(PANDOC_SCRIPT_FILE), "problems.lua" }))
     return { problems.filter({ Link = check_link }), problems.report }
@@ -13,7 +13,6 @@ local M = {}
 local found = {}
 local reported = {}
 local source = nil
-local has_sources = false
 
 function M.add(message)
   local line = source and (source .. ": " .. message) or message
@@ -27,7 +26,6 @@ local function track_raw(el)
   local marker = el.text:match("^<!%-%-%s*edit:%s*(.-)%s*%-%->$")
   if marker then
     source = marker
-    has_sources = true
   end
 end
 
@@ -41,7 +39,6 @@ local function track_div(el)
   local key = el.identifier:match("^ref%-(.+)$")
   if key then
     source = "bibliography entry '" .. key .. "'"
-    has_sources = true
   end
 end
 
@@ -73,9 +70,6 @@ M.report = {
   Pandoc = function()
     if #found == 0 then
       return
-    end
-    if not has_sources then
-      table.insert(found, "`ceos-ard validate` names the building blocks with these problems")
     end
     error("\n" .. table.concat(found, "\n") .. "\n", 0)
   end,

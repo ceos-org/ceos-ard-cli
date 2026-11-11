@@ -74,7 +74,7 @@ local function check_link(el)
 end
 
 local function check_image(el)
-  if el.src:match("^data:") then
+  if el.src:lower():match("^data:") then
     return
   end
   local path = asset(el.src)

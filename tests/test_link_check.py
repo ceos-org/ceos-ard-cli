@@ -40,6 +40,7 @@ def problems(markdown, folder, bibtex=""):
         "[document](assets/doc.pdf) and [same](./assets/doc.pdf)",
         "[page](assets/doc.pdf?page=2#intro) and [encoded](assets/my%20file.pdf)",
         "![logo](assets/logo.png) and ![inline](data:image/png;base64,AAAA)",
+        "![upper case](DATA:image/png;base64,AAAA)",
     ],
 )
 def test_allowed(content, markdown):
@@ -96,10 +97,12 @@ def test_reports_all_problems_with_their_building_block(content):
     ]
 
 
-def test_without_building_blocks_points_to_validate(content):
-    assert check_content("[x](www.example.com)", content)[-1] == (
-        "`ceos-ard validate` names the building blocks with these problems"
-    )
+def test_problems_before_the_first_building_block_have_no_source(content):
+    markdown = "![logo](assets/missing.png)\n\n## <!-- edit:a.yaml -->A\n\n[x](htps://x.org)\n"
+    assert check_content(markdown, content) == [
+        "The image doesn't exist: 'assets/missing.png'",
+        "a.yaml: Links must use one of the schemes http, https, mailto, ftp, ftps, sftp, s3, found 'htps://x.org'",
+    ]
 
 
 def test_checks_the_links_of_the_bibliography(content):
@@ -129,6 +132,5 @@ def test_generation_fails_on_broken_links_and_images(content):
         "Generating the html file failed:\n"
         "- Links must point to a file in the assets folder, found 'www.example.com' "
         "(did you mean 'https://www.example.com'?)\n"
-        "- The image doesn't exist: 'assets/missing.png'\n"
-        "- `ceos-ard validate` names the building blocks with these problems"
+        "- The image doesn't exist: 'assets/missing.png'"
     )

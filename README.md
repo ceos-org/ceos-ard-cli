@@ -75,8 +75,9 @@ A `::: {#toc}` div in the template is replaced by a table of contents of the hea
 Links in the content and in the bibliography (e.g. from `url` fields) must use one of the schemes
 `http`, `https`, `mailto`, `ftp`, `ftps`, `sftp` and `s3`, point to an anchor (e.g. `#sec:x`),
 or point to an existing file in the `assets` folder, which is the only folder that is published with the documents.
-Images must be existing files in the `assets` folder.
-Other links and images, e.g. `www.example.com` without `https://`, fail the generation with a list of all of them.
+Images must be existing files in the `assets` folder or `data:` URIs.
+Other links and images, e.g. `www.example.com` without `https://`, fail the generation with a list of all of them,
+which names the building block or bibliography entry that each problem is in.
 
 To limit what the content can do while the documents are generated:
 
@@ -105,8 +106,7 @@ To validate (most of) the building blocks, run:
 - With Pixi: `ceos-ard validate`
 - With traditional setup: `ceos-ard validate`
 
-If pandoc is installed, this also checks the links and images, as `ceos-ard generate` does,
-and names the building block or bibliography entry that each problem is in.
+If pandoc is installed, this also checks the links and images, as `ceos-ard generate` does.
 
 Check `ceos-ard validate --help` (or `ceos-ard validate --help`) for more details.
 
