@@ -19,7 +19,8 @@ local stringify = (require 'pandoc.utils').stringify
 
 --- configs – these are populated in the Meta filter.
 local default_pagebreaks = {
-  html = '<div style="page-break-after: always;"></div>',
+  -- a break before the div is skipped at the top of a page, a break after it would leave that page empty
+  html = '<div style="break-before: page;"></div>',
   latex = '\\newpage{}',
   ooxml = '<w:p><w:r><w:br w:type="page"/></w:r></w:p>',
 }
