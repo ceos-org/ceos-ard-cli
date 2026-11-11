@@ -15,7 +15,7 @@ from jinja2 import (
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 
 from ..schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS
-from .files import fix_path, read_file
+from .files import content_file, fix_path, read_file
 from .requirement import slugify
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates"
@@ -125,7 +125,7 @@ def read_document_sections(input_dir: Path) -> dict:
     """The document sections by id; None for a missing file, which the template then leaves out."""
     sections = {}
     for id in DOCUMENT_SECTIONS:
-        file = (Path(input_dir) / DOCUMENT_SECTION_PATH.format(id=id)).resolve()
+        file = content_file(input_dir, DOCUMENT_SECTION_PATH.format(id=id))
         sections[id] = read_document_section(file) if file.is_file() else None
     return sections
 

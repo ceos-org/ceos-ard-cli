@@ -76,6 +76,7 @@ To limit what the content can do while the documents are generated:
 
 - The pandoc Lua filters come with the CLI. Lua filters in the input directory are not used.
 - The Markdown template is rendered in Jinja's sandbox.
+- IDs and `@title:` references must point to files inside the input directory, and symbolic links are refused.
 - Chromium renders the PDF without JavaScript and only loads files from the output directory.
 
 Check `ceos-ard generate --help` (or `ceos-ard generate --help`) for more details.

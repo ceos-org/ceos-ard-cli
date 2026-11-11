@@ -1,9 +1,7 @@
-from pathlib import Path
-
 import bibtexparser
 import strictyaml
 
-from ..utils.files import read_file
+from ..utils.files import content_file, read_file
 from ..utils.yaml import read_yaml
 
 
@@ -15,8 +13,11 @@ class IdReference(strictyaml.ScalarValidator):
         self._resolve = resolve
 
     def validate_scalar(self, chunk):
-        file = Path(self._base_path) / Path(self._path_template.format(id=chunk.contents))
         content = None
+        try:
+            file = content_file(self._base_path, self._path_template.format(id=chunk.contents))
+        except ValueError:
+            chunk.expecting_but_found(f"expecting an id inside of the content folder, found '{chunk.contents}'")
         if not file.exists():
             chunk.expecting_but_found(f"expecting an existing file at {file} for id '{chunk.contents}'")
         elif file.suffix == ".yaml":

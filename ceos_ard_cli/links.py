@@ -3,7 +3,7 @@ from pathlib import Path
 
 import strictyaml
 
-from .utils.files import fix_path, read_file
+from .utils.files import content_file, fix_path, read_file
 from .utils.requirement import slugify
 
 # Matches @title:path/to/building-block references in Markdown text.
@@ -150,10 +150,14 @@ def resolve_titles(data, input_dir):
         if ref in titles:
             return titles[ref]
         title = None
-        file = input_dir / f"{ref}.yaml"
-        if not file.is_file():
+        file = None
+        try:
+            file = content_file(input_dir, f"{ref}.yaml")
+        except ValueError as e:
+            errors.append(f"Invalid building block '{ref}' in a title reference: {e}")
+        if file is not None and not file.is_file():
             errors.append(f"Unknown building block '{ref}' in a title reference, expected a file at {file}")
-        else:
+        elif file is not None:
             try:
                 content = strictyaml.load(read_file(file)).data
             except Exception as e:

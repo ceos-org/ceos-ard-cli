@@ -2,13 +2,24 @@
 
 import base64
 import http.server
+import importlib.util
+import os
 import re
 import shutil
+import subprocess
 import threading
+from pathlib import Path
 
 import pytest
+import strictyaml
 
 from ceos_ard_cli.generate import ORIGIN, local_file, run_pandoc, run_playwright
+from ceos_ard_cli.links import resolve_titles
+from ceos_ard_cli.schema import REFERENCE_PATH
+from ceos_ard_cli.strictyaml.id_reference import IdReference
+from ceos_ard_cli.utils import files
+from ceos_ard_cli.utils.files import check_no_symlinks, content_file
+from ceos_ard_cli.validate import validate
 
 needs_pandoc = pytest.mark.skipif(
     not (shutil.which("pandoc") and shutil.which("pandoc-crossref")), reason="needs pandoc and pandoc-crossref"
@@ -18,6 +29,85 @@ needs_pandoc = pytest.mark.skipif(
 def write(path, content):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+class TestPaths:
+    def test_content_file(self, tmp_path):
+        assert content_file(tmp_path, "references/a.bib") == (tmp_path / "references" / "a.bib").resolve()
+        for path in ["../a.bib", "references/../../a.bib", str(tmp_path.parent / "a.bib")]:
+            with pytest.raises(ValueError):
+                content_file(tmp_path, path)
+
+    # The id is put into ./references/{id}.bib, so it takes two levels to get out
+    @pytest.mark.parametrize("id", ["../../outside", "a/../../../outside"])
+    def test_ids_must_stay_inside(self, tmp_path, id):
+        write(tmp_path.parent / "outside.bib", "@misc{outside, title={Secret}}")
+        with pytest.raises(strictyaml.YAMLValidationError, match="inside of the content folder"):
+            strictyaml.load(f"- {id}", strictyaml.Seq(IdReference(REFERENCE_PATH, tmp_path)))
+
+    def test_title_references_must_stay_inside(self, tmp_path):
+        write(tmp_path.parent / "outside.yaml", "title: Secret\n")
+        data = {"description": f"see @title:/{(tmp_path.parent / 'outside').as_posix().lstrip('/')}"}
+        errors = resolve_titles(data, tmp_path)
+        assert len(errors) == 1
+        assert "Secret" not in data["description"]
+
+    def test_symlinks_are_refused(self, tmp_path):
+        write(tmp_path / "outside.txt", "secret")
+        (tmp_path / "content" / "assets").mkdir(parents=True)
+        try:
+            os.symlink(tmp_path / "outside.txt", tmp_path / "content" / "assets" / "logo.png")
+        except OSError:
+            pytest.skip("can't create symlinks")
+        with pytest.raises(ValueError, match="logo.png"):
+            check_no_symlinks(tmp_path / "content")
+
+    def test_validation_stops_at_symlinks(self, tmp_path, capsys):
+        # A linked template would otherwise be read from outside of the input folder
+        write(tmp_path / "outside.md", "~{ secret }~")
+        (tmp_path / "content" / "templates").mkdir(parents=True)
+        try:
+            os.symlink(tmp_path / "outside.md", tmp_path / "content" / "templates" / "template.md")
+        except OSError:
+            pytest.skip("can't create symlinks")
+
+        validate(tmp_path / "content")
+
+        output = capsys.readouterr().out
+        assert "Symbolic links are not supported" in output
+        assert "Validating PFS template" not in output
+
+    @pytest.mark.parametrize("link", ["assets", "governance/logo.png"])
+    def test_symlinks_anywhere_in_the_input_folder_are_refused(self, tmp_path, link):
+        # A content folder that is a link itself, or a link outside of the content folders that images can point to
+        write(tmp_path / "outside" / "logo.png", "secret")
+        (tmp_path / "content" / "governance").mkdir(parents=True)
+        target = tmp_path / "outside" / ("logo.png" if link.endswith(".png") else "")
+        try:
+            os.symlink(target, tmp_path / "content" / link, target_is_directory=target.is_dir())
+        except OSError:
+            pytest.skip("can't create symlinks")
+        with pytest.raises(ValueError, match=Path(link).name):
+            check_no_symlinks(tmp_path / "content")
+
+    @pytest.mark.skipif(os.name != "nt", reason="junctions only exist on Windows")
+    def test_junctions_are_refused(self, tmp_path, monkeypatch):
+        # Python 3.11 has no os.path.isjunction
+        monkeypatch.delattr(os.path, "isjunction", raising=False)
+        (tmp_path / "outside").mkdir()
+        (tmp_path / "content").mkdir()
+        link, target = tmp_path / "content" / "assets", tmp_path / "outside"
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], check=True, capture_output=True)
+        # A copy of the module that is loaded as on Python 3.11
+        spec = importlib.util.spec_from_file_location("files_without_isjunction", files.__file__)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with pytest.raises(ValueError, match="assets"):
+            module.check_no_symlinks(tmp_path / "content")
+
+    def test_no_symlinks(self, tmp_path):
+        write(tmp_path / "assets" / "logo.png", "")
+        check_no_symlinks(tmp_path)
 
 
 @pytest.fixture(scope="module")
