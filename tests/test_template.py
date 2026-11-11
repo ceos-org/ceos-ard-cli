@@ -15,7 +15,9 @@ from ceos_ard_cli.utils.template import (
     read_template,
     table_cell,
     template_file,
+    used_document_sections,
 )
+from ceos_ard_cli.validate import validate
 
 BUILT_IN = [
     "template.md",
@@ -213,6 +215,44 @@ def test_strict_templates_fail_on_undefined_variables(tmp_path):
     assert read_template(tmp_path).render(title="SR") == ""
     with pytest.raises(UndefinedError, match="'titel' is undefined"):
         read_template(tmp_path, strict=True).render(title="SR")
+
+
+ALL_SECTIONS = {"draft", "status", "definition", "introduction"}
+
+
+@pytest.mark.parametrize(
+    "template, used",
+    [
+        (None, ALL_SECTIONS),
+        ("No sections", set()),
+        ("~{ document.status.title }~ ~( if document['draft'] )~x~( endif )~", {"status", "draft"}),
+        ('~( include "part.md" )~', {"definition"}),
+        ("~( macro m(d) )~~( endmacro )~~{ m(document) }~", ALL_SECTIONS),
+        ("~( for s in document.values() )~~( endfor )~", ALL_SECTIONS),
+        ("~{ document[name] }~", ALL_SECTIONS),
+        ("~( include name ignore missing )~", ALL_SECTIONS),
+    ],
+)
+def test_used_document_sections(tmp_path, template, used):
+    if template is not None:
+        write(tmp_path / "templates" / "template.md", template)
+    write(tmp_path / "templates" / "part.md", "~{ document.definition.description }~")
+
+    assert used_document_sections(tmp_path) == used
+
+
+@pytest.mark.parametrize("template, message", [(None, "its text is left out"), ("Custom", "not used by the template")])
+def test_validation_only_warns_about_missing_sections_that_are_used(tmp_path, capsys, template, message):
+    if template is not None:
+        write(tmp_path / "templates" / "template.md", template)
+    for folder in ["pfs", "requirements", "glossary", "sections"]:
+        (tmp_path / folder).mkdir()
+
+    validate(tmp_path)
+
+    lines = [line for line in capsys.readouterr().out.splitlines() if "sections/document/" in line]
+    assert len(lines) == 4
+    assert all(message in line for line in lines)
 
 
 @pytest.mark.parametrize("combined, expected", [(False, 3), (True, 0)])
