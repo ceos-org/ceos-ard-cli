@@ -139,6 +139,19 @@ def test_json_output_of_generate_all(tmp_path):
     assert sorted(problem["file"] for problem in problems) == ["requirements/a.yaml", "requirements/b.yaml"]
 
 
+@pytest.mark.parametrize("command", ["generate", "compile"])
+def test_json_output_has_one_problem_per_broken_link(tmp_path, command):
+    content(tmp_path, {"a": VALID.replace("description: Text", "description: See @title:nope and @title:none")})
+
+    exit_code, problems = run_json(command, "A", "-i", str(tmp_path), "-o", str(tmp_path / "out" / "A"))
+
+    assert exit_code == 1
+    assert [(p["pfs"], "nope" in p["message"], "none" in p["message"]) for p in problems] == [
+        ("A", True, False),
+        ("A", False, True),
+    ]
+
+
 def test_json_output_of_problems_without_a_file(tmp_path):
     exit_code, problems = run_json("generate", "MISSING", "-i", str(tmp_path), "-o", str(tmp_path / "out" / "X"))
 

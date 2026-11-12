@@ -60,6 +60,7 @@ def problem(tmp_path, text):
         (HEAD + PART + "glossary:\n  - nope\n", "'nope' doesn't exist, there's no file glossary/nope.yaml", 7, 5),
         (HEAD + PART + "glossary:\n  - g\n  - g\n", "'g' is listed more than once", 8, 5),
         (HEAD + PART + "references:\n  - ../../x\n", "'../../x' points outside of the content folder", 7, 5),
+        (HEAD + PART + "glossary:\n  - a: b\n", "when expecting an id\nfound a mapping", 7, 5),
         (HEAD + PART + CHANGE.format(date="1.1.2026"), "expecting a date as YYYY-MM-DD", 7, 11),
         (HEAD + PART + CHANGE.format(date="2026-02-30"), "expecting a date as YYYY-MM-DD", 7, 11),
         ("id: a\ntitle:\n" + PART, "expecting text, found an empty value", 2, 1),

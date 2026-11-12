@@ -64,7 +64,10 @@ def check_rendering(data: dict, input_dir: Path, pfs: str | None = None) -> list
             # Rendering changes the data, and copying it is much faster than reading it again
             markdown = render_markdown(copy.deepcopy(data), editable, input_dir, strict=True)
         except Exception as e:
-            errors.append((f"template ({kind}): {e}", Problem(pfs=pfs, message=f"template ({kind}): {e}")))
+            problem = to_problem(e, input_dir, pfs=pfs)
+            if problem.file is None:
+                problem = Problem(pfs=pfs, message=f"template ({kind}): {e}")
+            errors.append((f"template ({kind}): {e}", problem))
             continue
         # The editable document has all the content of the read-only one, and names the building blocks
         if editable and shutil.which("pandoc"):
@@ -77,7 +80,20 @@ def validate(input_dir, out: Callable[[str], None] = print) -> list[Problem]:
     """All problems in the order they were found, `out` gets the text output while validating."""
     input_dir = Path(input_dir).resolve()
     problems = []
+    try:
+        _validate(input_dir, out, problems)
+    except Exception as e:
+        # Keeps the problems found so far
+        out(f"- {e}")
+        problems.append(to_problem(e, input_dir))
+    return problems
 
+
+def _yaml_files(folder: Path) -> list[Path]:
+    return get_all_files(folder) if folder.is_dir() else []
+
+
+def _validate(input_dir: Path, out: Callable[[str], None], problems: list[Problem]):
     def check(id, error=None, file=None, pfs=None):
         out(f"- {id}: {'OK' if error is None else error}")
         if error is not None:
@@ -89,13 +105,15 @@ def validate(input_dir, out: Callable[[str], None] = print) -> list[Problem]:
     except Exception as e:
         check("content folder", e)
         # The other checks would read the files the links point to
-        return problems
+        return
     check("content folder")
 
     out("Validating PFS template")
+    template_valid = True
     try:
         check_template(input_dir)
     except Exception as e:
+        template_valid = False
         check(TEMPLATE_PATH, e, file=TEMPLATE_PATH)
     else:
         check(TEMPLATE_PATH)
@@ -145,7 +163,8 @@ def validate(input_dir, out: Callable[[str], None] = print) -> list[Problem]:
             # check that all dependencies and sections links can be resolved
             link_errors += resolve_links(links, input_dir)
             errors = [(message, Problem(pfs=pfs, message=message)) for message in link_errors]
-            if not errors:
+            # A broken template would fail each PFS for the same reason
+            if not errors and template_valid:
                 errors = check_rendering(data, input_dir, pfs)
         except Exception as e:
             all_read = False
@@ -163,28 +182,31 @@ def validate(input_dir, out: Callable[[str], None] = print) -> list[Problem]:
     # A PFS that can't be read stops reading at the problem, so its other files would look unused
     if not all_read:
         out("- skipped, as not all PFS could be read")
-    # The files that were read during PFS validation
+    # The files that were read during PFS validation, but not necessarily validated (e.g. by @title: references)
     used_files = set(FILE_CACHE.keys())
-    all_req_files = get_all_files(input_dir / "requirements")
+    all_req_files = _yaml_files(input_dir / "requirements")
     # The requirements are validated by the check for duplicate IDs below
-    all_files = [(file, GLOSSARY) for file in get_all_files(input_dir / "glossary")]
-    all_files += [(file, SECTION) for file in get_all_files(input_dir / "sections")]
+    all_files = [(file, GLOSSARY) for file in _yaml_files(input_dir / "glossary")]
+    all_files += [(file, SECTION) for file in _yaml_files(input_dir / "sections")]
     all_files += [(file, None) for file in all_req_files]
     for file, schema in all_files:
-        if str(file.absolute()) in used_files:
-            continue
         rel_path = file.relative_to(input_dir)
         # Templates for new building blocks, not meant to be used
-        if all_read and file.name != "_template.yaml":
+        listed = all_read and str(file.absolute()) not in used_files and file.name != "_template.yaml"
+        if listed:
             out(f"- {rel_path}")
             problems.append(Problem(file=fix_path(rel_path), severity=WARNING, message="not referenced by any PFS"))
         if schema is None:
             continue
         try:
+            # Cached for the files that a PFS has validated already
             read_yaml(file, schema, input_dir)
         except Exception as e:
-            out(f"  - ERROR: {e}" if all_read else f"- {rel_path}: {e}")
-            problems.append(to_problem(e, input_dir, file=fix_path(rel_path)))
+            problem = to_problem(e, input_dir, file=fix_path(rel_path))
+            # Unless a PFS that uses it has reported it
+            if problem not in problems:
+                out(f"  - ERROR: {e}" if listed else f"- {rel_path}: {e}")
+                problems.append(problem)
 
     out("Checking for duplicate requirement IDs")
     ids = {}
@@ -206,4 +228,3 @@ def validate(input_dir, out: Callable[[str], None] = print) -> list[Problem]:
                 ids[req_id] = path
         except Exception as e:
             check(rel_path, e, file=path)
-    return problems

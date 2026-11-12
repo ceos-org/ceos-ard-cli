@@ -7,7 +7,7 @@ from dirsync import sync
 
 from .changelog import DEFAULT_GITHUB_REPO, compile_changelog
 from .links import resolve_links, resolve_titles
-from .problems import deprecation, report
+from .problems import MultipleErrors, deprecation, report
 from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.deprecation import describe, find_deprecated_blocks
 from .utils.files import check_no_symlinks, content_file, read_file, write_file
@@ -502,7 +502,7 @@ def render_markdown(
     # and replace the @alias references in the texts with @sec: anchors
     errors += resolve_links(context, input_dir)
     if errors:
-        raise ValueError("\n".join(errors))
+        raise MultipleErrors("\n".join(errors), errors)
 
     # combined documents never have a document history
     if history and not context.get("combined"):

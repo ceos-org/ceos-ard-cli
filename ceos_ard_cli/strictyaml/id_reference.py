@@ -23,6 +23,9 @@ def bibtex_field_problems(entry) -> list[str]:
 
 
 class IdReference(strictyaml.ScalarValidator):
+    # strictyaml's default is the class name
+    rule_description = "an id"
+
     def __init__(self, path_template, base_path, schema=None, resolve=True):
         self._path_template = path_template
         self._base_path = base_path

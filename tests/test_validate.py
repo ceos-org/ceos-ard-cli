@@ -8,6 +8,7 @@ from click.testing import CliRunner
 from ceos_ard_cli import cli
 from ceos_ard_cli.utils import files, yaml
 from ceos_ard_cli.problems import unique
+from ceos_ard_cli.schema import DOCUMENT_SECTIONS
 from ceos_ard_cli.validate import validate
 
 VALID = "id: {id}\ntitle: Title\nrequirements:\n  threshold:\n    description: Text\n"
@@ -237,5 +238,56 @@ def test_json_output_of_unexpected_errors(tmp_path):
     exit_code, problems = run_json("-i", str(tmp_path / "missing"))
 
     assert exit_code == 1
-    assert len(problems) == 1
-    assert problems[0]["severity"] == "error"
+    # The missing pfs folder ends the validation, the problems found before are kept
+    assert [p.get("file") for p in problems[:-1]] == [f"sections/document/{id}.md" for id in DOCUMENT_SECTIONS]
+    assert problems[-1]["severity"] == "error"
+    assert "file" not in problems[-1]
+
+
+def test_missing_building_block_folders_are_empty(tmp_path):
+    complete(tmp_path, {"a": VALID})
+    (tmp_path / "glossary").rmdir()
+    (tmp_path / "templates" / "template.md").write_text("~( if )~\n", encoding="utf-8")
+
+    problems = validate(tmp_path, out=lambda _: None)
+
+    assert [(p.file, p.line) for p in errors(problems)] == [("templates/template.md", 1)]
+
+
+def test_title_references_dont_skip_the_validation(tmp_path):
+    complete(tmp_path, {"a": VALID.replace("description: Text", "description: See @title:glossary/g")})
+    pfs(tmp_path, "X", "a")
+    (tmp_path / "glossary" / "g.yaml").write_text("term: G\n", encoding="utf-8")
+
+    problems = validate(tmp_path, out=lambda _: None)
+
+    assert problems_of(problems, "glossary/g.yaml") == [
+        {
+            "file": "glossary/g.yaml",
+            "line": 1,
+            "column": 1,
+            "severity": "error",
+            "message": "required key(s) 'description' not found",
+        }
+    ]
+
+
+def test_problems_of_used_files_are_reported_once(tmp_path, capsys):
+    content(tmp_path, {"a": VALID + "glossary:\n  - g\n"})
+    (tmp_path / "glossary" / "g.yaml").write_text("term: G\n", encoding="utf-8")
+    pfs(tmp_path, "X", "a")
+
+    validate(tmp_path)
+
+    output = capsys.readouterr().out.split("Checking for files not referenced by any PFS")[1]
+    assert "glossary" not in output.split("Checking for duplicate requirement IDs")[0]
+
+
+def test_a_broken_template_is_reported_once(tmp_path):
+    complete(tmp_path, {"a": VALID})
+    pfs(tmp_path, "X", "a")
+    (tmp_path / "templates" / "template.md").write_text("~( include 'missing.md' )~\n", encoding="utf-8")
+
+    problems = validate(tmp_path, out=lambda _: None)
+
+    assert [p.file for p in errors(problems)] == ["templates/template.md"]
