@@ -208,7 +208,7 @@ This also applies to the bibliography, e.g. `url` fields. A link like `www.examp
 - Attributes other than `width` and `height` (e.g. `{width=50%}` on an image), and `label`, `columns` and `widths`, which the template uses.
 - Metadata other than the front matter of `template.md`, so the content can't add e.g. `css`.
 - IDs and `@title:` references that point outside of the input folder.
-- Symbolic links in the input folder.
+- Symbolic links in the input folder. Only top-level folders that start with a dot (e.g. `.venv`) and `node_modules` may contain links.
 
 **While generating**
 
