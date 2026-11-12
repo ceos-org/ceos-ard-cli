@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from ceos_ard_cli.generate import generate, pandoc_errors, run_pandoc
+from ceos_ard_cli.generate import generate, generate_all, pandoc_errors, run_pandoc
 
 needs_pandoc = pytest.mark.skipif(
     not (shutil.which("pandoc") and shutil.which("pandoc-crossref")), reason="needs pandoc and pandoc-crossref"
@@ -178,3 +178,33 @@ def test_stable_documents_get_a_file_name_for_any_version(tmp_path, failing_comp
 
     assert module.compile(["A", "B"], tmp_path / "out" / "A-B", tmp_path, stable=True).name == "A-B-vn-a"
     assert (tmp_path / "out" / "A-B.md").read_text(encoding="utf-8") == "draft"
+
+
+@pytest.fixture
+def generated(monkeypatch):
+    calls = []
+
+    def generate(pfs, output, *args, **kwargs):
+        calls.append((pfs, Path(output).name))
+        if pfs == "broken":
+            raise ValueError("broken")
+
+    monkeypatch.setattr(importlib.import_module("ceos_ard_cli.generate"), "generate", generate)
+    return calls
+
+
+def test_generate_all_builds_the_folders_in_pfs(tmp_path, generated):
+    for name in ["SR", "AR", "SR.old", ".hidden", "broken"]:
+        (tmp_path / "pfs" / name).mkdir(parents=True)
+    write(tmp_path / "pfs" / "notes.txt", "not a PFS")
+    errors = generate_all(tmp_path / "out", tmp_path)
+    # sorted, with the full folder names, and the others are built if one fails
+    assert generated == [("AR", "AR"), ("SR", "SR"), ("SR.old", "SR.old"), ("broken", "broken")]
+    assert errors == 1
+
+
+def test_generate_all_builds_the_given_pfs_in_their_order(tmp_path, generated):
+    for name in ["AR", "NRB", "SR"]:
+        (tmp_path / "pfs" / name).mkdir(parents=True)
+    assert generate_all(tmp_path / "out", tmp_path, pfs_list=["SR", "AR"]) == 0
+    assert generated == [("SR", "SR"), ("AR", "AR")]
