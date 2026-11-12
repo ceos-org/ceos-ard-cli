@@ -99,6 +99,10 @@ Creates `SR.html`, `SR.docx` and `SR.pdf` for the PFS in `pfs/SR`, together with
 
 The HTML document is always created.
 
+Before generating, the CLI checks that pandoc, pandoc-crossref and, for PDFs, the browser are available,
+and warns about pandoc versions it isn't tested with.
+Set the environment variable `CEOS_ARD_SKIP_TOOL_CHECK=1` to skip the checks, e.g. on a server with a fixed environment.
+
 **Combined documents.** Several PFSes are merged into a single document:
 
 ```bash
