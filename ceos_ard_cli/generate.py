@@ -1,12 +1,15 @@
+import base64
 import os
 import subprocess
+import tempfile
+from functools import cache
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 
 from .changelog import DEFAULT_GITHUB_REPO
 from .compile import compile, remove_outputs
 from .utils.files import read_file
-from .utils.template import FILTERS_DIR, template_file, template_metadata_keys
+from .utils.template import FILTERS_DIR, TEMPLATES_DIR, template_file, template_metadata_keys
 
 # Chromium only gets the output folder, served from an address that doesn't exist
 ORIGIN = "https://ceos-ard.invalid"
@@ -20,6 +23,29 @@ def pandoc_errors(stderr: str) -> list[str]:
     if found:
         return [line.strip() for line in message.partition("\n")[2].splitlines() if line.strip()] or ["pandoc failed"]
     return [" ".join(line.strip() for line in text.splitlines() if line.strip()) or "pandoc failed"]
+
+
+# The fonts of the documents: file name => (weight, style)
+FONT_FAMILY = "Carlito"
+FONTS = {
+    "Carlito-Regular.woff2": ("normal", "normal"),
+    "Carlito-Bold.woff2": ("bold", "normal"),
+    "Carlito-Italic.woff2": ("normal", "italic"),
+    "Carlito-BoldItalic.woff2": ("bold", "italic"),
+}
+
+
+@cache
+def font_styles() -> str:
+    """The fonts as a style element, embedded so that the HTML and the PDF look the same everywhere."""
+    rules = []
+    for name, (weight, style) in FONTS.items():
+        data = base64.b64encode((TEMPLATES_DIR / "fonts" / name).read_bytes()).decode("ascii")
+        rules.append(
+            f"@font-face {{ font-family: {FONT_FAMILY}; font-weight: {weight}; font-style: {style}; "
+            f"src: url(data:font/woff2;base64,{data}) format('woff2'); }}"
+        )
+    return "<style>\n" + "\n".join(rules) + "\n</style>\n"
 
 
 def pandoc_env(input_dir: Path) -> dict[str, str]:
@@ -197,15 +223,20 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
         raise ValueError(f"Unsupported format {format}")
 
     # Captured, so that the messages appear in order with the progress and without the filters' stack traces
-    result = subprocess.run(
-        cmd,
-        cwd=input_dir,
-        env=pandoc_env(input_dir),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+    with tempfile.TemporaryDirectory() as folder:
+        if format == "html":
+            fonts = Path(folder) / "fonts.html"
+            fonts.write_text(font_styles(), encoding="utf-8")
+            cmd.append(f"--include-in-header={fonts}")
+        result = subprocess.run(
+            cmd,
+            cwd=input_dir,
+            env=pandoc_env(input_dir),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
     if result.returncode != 0:
         errors = pandoc_errors(result.stderr)
         details = f" {errors[0]}" if len(errors) == 1 else "".join(f"\n- {error}" for error in errors)
