@@ -189,3 +189,14 @@ def test_generating_prepares_the_document_once(tmp_path, monkeypatch):
     generate("SR", tmp_path / "out" / "SR", tmp_path, no_pdf=True)
 
     assert calls == ["symlinks", "assets", "data", "markdown", "bibtex", "pandoc", "markdown", "bibtex", "pandoc"]
+
+
+def test_stable_documents_get_a_file_name_for_any_version(tmp_path, failing_compile, monkeypatch):
+    module, _ = failing_compile
+    # the version of combined documents
+    monkeypatch.setattr(module, "read_data", lambda *args, **kwargs: {"version": "n/a"})
+    monkeypatch.setattr(module, "compile_bibtex", lambda *args, **kwargs: None)
+    write(tmp_path / "out" / "A-B.md", "draft")
+
+    assert module.compile(["A", "B"], tmp_path / "out" / "A-B", tmp_path, stable=True).name == "A-B-vn-a"
+    assert (tmp_path / "out" / "A-B.md").read_text(encoding="utf-8") == "draft"

@@ -375,7 +375,9 @@ def prepare(
             remove_outputs(out)
         raise
     if stable:
-        out = out.with_name(f"{out.name}-v{data['version']}")
+        # A version can have characters that file names can't, e.g. n/a for combined documents
+        version = re.sub(r'[\\/:*?"<>|]+', "-", data["version"])
+        out = out.with_name(f"{out.name}-v{version}")
     return data, out
 
 
