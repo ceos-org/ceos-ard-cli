@@ -1,0 +1,49 @@
+name: Set up the CEOS-ARD CLI
+description: Installs the CEOS-ARD CLI with the pandoc, pandoc-crossref and Python packages that its release locks
+inputs:
+  browser:
+    description: Whether to install the browser for the PDF generation, not needed for e.g. `validate`
+    default: "true"
+  requirements-file:
+    description: >
+      A requirements file (e.g. requirements.txt) that must require the same CLI version as the action,
+      with ~= or == and a version like 1.2.3. Not checked if empty.
+    default: ""
+runs:
+  using: composite
+  steps:
+    - name: Compare with the CLI version in the requirements file
+      if: inputs.requirements-file != ''
+      shell: bash
+      env:
+        REQUIREMENTS_FILE: ${{ inputs.requirements-file }}
+      # The same rules as the editor: one line without comments, with the canonical name of the package
+      run: |
+        version=$(sed -nE 's/^__version__ = "(.*)"$/\1/p' "$GITHUB_ACTION_PATH/ceos_ard_cli/version.py")
+        mapfile -t lines < <(sed -E 's/#.*//; s/^[[:space:]]+//; s/[[:space:]]+$//' "$REQUIREMENTS_FILE" | grep -v '^$' || true)
+        shopt -s nocasematch
+        pattern='^ceos[-_.]+ard[-_.]+cli[[:space:]]*(~=|==)[[:space:]]*([0-9]+\.[0-9]+\.[0-9]+)$'
+        if [[ ${#lines[@]} -ne 1 || ! "${lines[0]}" =~ $pattern ]]; then
+          echo "$REQUIREMENTS_FILE must only contain one line like ceos-ard-cli~=$version"
+          exit 1
+        fi
+        if [[ "${BASH_REMATCH[2]}" != "$version" ]]; then
+          echo "$REQUIREMENTS_FILE requires CEOS-ARD CLI ${BASH_REMATCH[2]}, but the action is CEOS-ARD CLI $version"
+          exit 1
+        fi
+    - uses: prefix-dev/setup-pixi@v0.11.3
+      with:
+        pixi-version: v0.49.0
+        manifest-path: ${{ github.action_path }}/pyproject.toml
+        locked: true
+        activate-environment: true
+    - name: Show the toolchain
+      shell: bash
+      run: |
+        ceos-ard --version
+        pandoc --version
+        pandoc-crossref --version
+    - name: Install the browser for the PDF generation
+      if: inputs.browser == 'true'
+      shell: bash
+      run: playwright install chromium --with-deps
