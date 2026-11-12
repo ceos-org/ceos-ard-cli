@@ -1,6 +1,7 @@
 """Tests for the copy of the assets folder next to the documents."""
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -89,6 +90,41 @@ class TestAssets:
             sync_assets(source, target)
         assert (tmp_path / "outside" / "a.png").read_text() == "theirs"
         assert (tmp_path / "outside" / "sub" / "b.png").read_text() == "theirs"
+
+    def test_renames_that_only_change_the_case(self, tmp_path):
+        source, target = tmp_path / "assets", tmp_path / "out" / "assets"
+        write(source / "sub" / "logo.png", "logo")
+        sync_assets(source, target)
+        (source / "sub" / "logo.png").rename(source / "sub" / "Logo.png")
+        (source / "sub").rename(source / "Sub")
+        sync_assets(source, target)
+        assert tree(target) == ["Sub", "Sub/Logo.png"]
+
+    @pytest.mark.parametrize("name", [ASSETS_MARKER, ASSETS_MARKER.upper()])
+    def test_the_name_of_the_marker_is_reserved(self, tmp_path, name):
+        source, target = tmp_path / "assets", tmp_path / "out" / "assets"
+        write(source / "a.png", "a")
+        sync_assets(source, target)
+        write(source / name / "b.png", "b")
+        with pytest.raises(ValueError, match="is reserved"):
+            sync_assets(source, target)
+        assert tree(target) == ["a.png"]
+
+    def test_unreadable_folders_fail_before_files_are_removed(self, tmp_path, monkeypatch):
+        source, target = tmp_path / "assets", tmp_path / "out" / "assets"
+        write(source / "sub" / "a.png", "a")
+        sync_assets(source, target)
+        walk = os.walk
+
+        def unreadable(top, onerror=None):
+            if Path(top) == source and onerror:
+                onerror(PermissionError("denied"))
+            return walk(top, onerror=onerror)
+
+        monkeypatch.setattr(os, "walk", unreadable)
+        with pytest.raises(PermissionError):
+            sync_assets(source, target)
+        assert tree(target) == ["sub", "sub/a.png"]
 
     def test_without_assets(self, tmp_path):
         target = tmp_path / "out" / "assets"

@@ -1,48 +1,56 @@
 # CEOS-ARD CLI <!-- omit in toc -->
 
-CLI for working with the [CEOS-ARD building blocks and PFSes](https://github.com/ceos-org/ceos-ard).
-
-- [Getting Started](#getting-started)
-  - [Installation](#installation)
-  - [Run the CLI](#run-the-cli)
-  - [GitHub Actions](#github-actions)
-- [Commands](#commands)
-  - [`ceos-ard compile`: Compile PFS document to a Markdown file](#ceos-ard-compile-compile-pfs-document-to-a-markdown-file)
-  - [`ceos-ard generate`: Create Word/HTML/PDF documents for a single PFS](#ceos-ard-generate-create-wordhtmlpdf-documents-for-a-single-pfs)
-  - [`ceos-ard generate-all`: Create Word/HTML/PDF documents for all PFSes](#ceos-ard-generate-all-create-wordhtmlpdf-documents-for-all-pfses)
-  - [`ceos-ard validate`: Validate CEOS-ARD components](#ceos-ard-validate-validate-ceos-ard-components)
-  - [`ceos-ard check-changes`: Check for missing changelog entries](#ceos-ard-check-changes-check-for-missing-changelog-entries)
-  - [Document History](#document-history)
-- [Development](#development)
-
-## Getting Started
-
-In order to make working with CEOS-ARD easier we have developed command-line interface (CLI) tools.
+Validates the [CEOS-ARD building blocks](https://github.com/ceos-org/ceos-ard) and generates the PFS documents from them as HTML, Word and PDF.
 
 > [!TIP]
 > Most people won't need to install this tool.
-> Instead, you can use the [CEOS-ARD Editor](https://editor.ceos-ard.moregeo.it)
-> to edit and/or generate the CEOS-ARD PFS documents.
+> The [CEOS-ARD Editor](https://editor.ceos-ard.moregeo.it) edits the building blocks and generates the documents in the browser.
 
-### Installation
+- [Getting started](#getting-started)
+  - [Install](#install)
+  - [Run](#run)
+  - [GitHub Actions](#github-actions)
+- [Commands](#commands)
+  - [`generate`](#generate)
+  - [`generate-all`](#generate-all)
+  - [`compile`](#compile)
+  - [`validate`](#validate)
+  - [`check-changes`](#check-changes)
+- [Document history](#document-history)
+- [Content rules](#content-rules)
+- [Templates](#templates)
+- [Development](#development)
 
-[Pixi](https://pixi.sh/) is a modern package management tool that handles both conda and PyPI dependencies.
+## Getting started
 
-1. Install Pixi by following the [installation instructions](https://pixi.sh/latest/#installation) (don't follow the "Get Started" instructions, you only need to run the single command provided in the "Installation" section).
-2. Clone this repository and the ceos-ard repository:
-   - `git clone https://github.com/ceos-org/ceos-ard`
-   - `git clone https://github.com/ceos-org/ceos-ard-cli`
-3. Navigate to the directory: `cd ceos-ard-cli`
-4. Install dependencies: `pixi install`
-5. Install browser for PDF rendering: `pixi run install-browser`
+### Install
 
-### Run the CLI
+The CLI runs in a [Pixi](https://pixi.sh/) environment, which provides the versions of Python, pandoc and pandoc-crossref that it is tested with. Other setups are not supported.
 
-1. Run `pixi shell`
-2. Switch into the folder that contains the contents of the `ceos-ard` repository: `cd ../ceos-ard`
-3. Run `ceos-ard` with the command you want to execute, e.g. `ceos-ard generate-all -o build`
+1. [Install Pixi](https://pixi.sh/latest/#installation). The single command in the "Installation" section is enough.
+2. Clone the CLI and the building blocks next to each other:
+   ```bash
+   git clone https://github.com/ceos-org/ceos-ard-cli
+   git clone https://github.com/ceos-org/ceos-ard
+   ```
+3. Install the CLI:
+   ```bash
+   cd ceos-ard-cli
+   pixi install
+   pixi run install-browser  # only needed for PDFs
+   ```
 
-See the [available commands](#commands) for further details.
+### Run
+
+In the `ceos-ard-cli` folder:
+
+```bash
+pixi shell                    # activates the environment
+cd ../ceos-ard                # the folder with the building blocks
+ceos-ard generate-all -o build
+```
+
+Add `--pdf` to skip the PDFs if you didn't install the browser.
 
 ### GitHub Actions
 
@@ -60,153 +68,194 @@ so pass it as `requirements-file` to generate the documents with the same versio
 
 ## Commands
 
-### `ceos-ard compile`: Compile PFS document to a Markdown file
+| Command | What it does |
+| --- | --- |
+| [`ceos-ard generate`](#generate) | Creates the HTML, Word and PDF documents of a PFS |
+| [`ceos-ard generate-all`](#generate-all) | Creates the documents of all PFSes |
+| [`ceos-ard compile`](#compile) | Creates only the Markdown file of a PFS |
+| [`ceos-ard validate`](#validate) | Checks the building blocks |
+| [`ceos-ard check-changes`](#check-changes) | Checks that changed building blocks have a changelog entry |
 
-To compile a PFS document to a Markdown file, run:
+All commands read the building blocks from the current folder. Pass `-i <folder>` to read them from another folder.
+`ceos-ard <command> --help` lists all options.
 
-- With Pixi: `ceos-ard compile SR`
-- With traditional setup: `ceos-ard compile SR`
+### `generate`
 
-The last part is the PFS to create, e.g. `SR` or `NRB`.
+```bash
+ceos-ard generate SR
+```
 
-Check `ceos-ard compile --help` (or `ceos-ard compile --help`) for more details.
+Creates `SR.html`, `SR.docx` and `SR.pdf` for the PFS in `pfs/SR`, together with the intermediate `SR.md` and `SR.bib`.
 
-### `ceos-ard generate`: Create Word/HTML/PDF documents for a single PFS
+| Option | Effect |
+| --- | --- |
+| `-o`, `--output` | Output file without file extension, e.g. `-o build/SR`. Defaults to the name of the PFS. |
+| `--pdf` | **Skips** the PDF |
+| `--docx` | **Skips** the Word document |
+| `-s`, `--self-contained` | Embeds images and styles into the HTML file |
+| `-r`, `--stable` | Removes the `-draft` suffix from the version and adds the version to the file name, e.g. `SR-v1.0.0.html` |
+| `--id`, `--title`, `--version`, `--pfs-type` | Override the metadata of the document |
+| `--history`, `--patch-changes`, `--github-repo`, `--offline` | See [Document history](#document-history) |
 
-To create the Word, HTML, and PDF versions of a single PFS, run:
+The HTML document is always created.
 
-- With Pixi: `ceos-ard generate SR`
-- With traditional setup: `ceos-ard generate SR`
-
-The last part is the PFS to create, e.g. `SR` or `NRB`.
-
-To create a combined PFS, e.g. SAR, the following command can be used:
-`ceos-ard generate NRB POL ORB GSLC -o ../ceos-ard/build/Combined-SAR -i ../ceos-ard --title="Combined Synthetic Aperture Radar" --pfs-type="SAR" --id="SAR"`
-
-By default, HTML, PDF, and Word documents are generated.
-Pass `--pdf` to skip the PDF output and/or `--docx` to skip the Word output; the HTML version is always generated.
-A `::: {#toc}` div in the template is replaced by a table of contents of the headings that follow it.
-
-Before generating, the CLI checks that pandoc, pandoc-crossref and, for PDFs, the browser are available and warns about pandoc versions it isn't tested with.
+Before generating, the CLI checks that pandoc, pandoc-crossref and, for PDFs, the browser are available,
+and warns about pandoc versions it isn't tested with.
 Set the environment variable `CEOS_ARD_SKIP_TOOL_CHECK=1` to skip the checks, e.g. on a server with a fixed environment.
 
-Links in the content and in the bibliography (e.g. from `url` fields) must use one of the schemes
-`http`, `https`, `mailto`, `ftp`, `ftps`, `sftp` and `s3`, point to an anchor (e.g. `#sec:x`),
-or point to an existing file in the `assets` folder, which is the only folder that is published with the documents.
-Images must be existing files in the `assets` folder or `data:` URIs.
-Other links and images, e.g. `www.example.com` without `https://`, fail the generation with a list of all of them,
-which names the building block or bibliography entry that each problem is in.
+**Combined documents.** Several PFSes are merged into a single document:
 
-To limit what the content can do while the documents are generated:
+```bash
+ceos-ard generate NRB POL ORB GSLC -o build/Combined-SAR --id SAR --title "Combined Synthetic Aperture Radar" --pfs-type SAR
+```
 
-- The pandoc Lua filters come with the CLI. Lua filters in the input directory are not used.
-- The Markdown template is rendered in Jinja's sandbox.
-- Raw HTML and other raw output (e.g. ` ```{=html} `) is refused, except for HTML comments.
-- Only the attributes `width` and `height` (e.g. `{width=50%}` on an image), which work in all formats,
-  and `label`, `columns` and `widths`, which the template uses, are allowed.
-- Only the metadata of the front matter of `template.md` is allowed, so the content can't add any, e.g. `css`.
-- IDs and `@title:` references must point to files inside the input directory, and symbolic links are refused.
-  Only top-level folders that start with a dot (e.g. `.venv`) and `node_modules` may contain links.
-- Chromium renders the PDF without JavaScript and only loads files from the output directory.
+### `generate-all`
 
-The HTML, Word and PDF templates that replace the built-in ones from the input directory are trusted and not checked.
+```bash
+ceos-ard generate-all -o build
+```
 
-Check `ceos-ard generate --help` (or `ceos-ard generate --help`) for more details.
+Runs `generate` for every PFS in the `pfs` folder.
 
-### `ceos-ard generate-all`: Create Word/HTML/PDF documents for all PFSes
+| Option | Effect |
+| --- | --- |
+| `-o`, `--output` | Output folder, defaults to the current folder |
+| `-p`, `--pfs` | Only generates the given PFS, can be repeated |
+| `--pdf`, `--docx`, `-s`, `-r`, `--history`, `--patch-changes`, `--github-repo`, `--offline` | As for `generate` |
 
-To create the Word, HTML, and PDF versions for all PFSes, run:
+### `compile`
 
-- With Pixi: `ceos-ard generate-all`
-- With traditional setup: `ceos-ard generate-all`
+```bash
+ceos-ard compile SR
+```
 
-As with `ceos-ard generate`, pass `--pdf` and/or `--docx` to skip the PDF and/or Word outputs.
+Creates only the Markdown file (`SR.md`) and the bibliography (`SR.bib`) that the documents are generated from.
 
-Check `ceos-ard generate-all --help` (or `ceos-ard generate-all --help`) for more details.
+Like `generate`, it also copies the `assets` folder next to the output file and removes all other files from that copy.
+It fails if an `assets` folder with files exists there that the CLI didn't create, so choose another output folder or remove it.
 
-### `ceos-ard validate`: Validate CEOS-ARD components
+| Option | Effect |
+| --- | --- |
+| `-o`, `--output` | Output file without file extension |
+| `-e`, `--editable` | Adds an "Assessment" section to the requirements, as in the Word documents |
+| `-r`, `--stable` | As for `generate` |
+| `--debug` | Writes the data of the template as `SR.debug.json` and shows stack traces |
+| `--history`, `--patch-changes`, `--github-repo`, `--offline` | See [Document history](#document-history) |
 
-To validate (most of) the building blocks, run:
+### `validate`
 
-- With Pixi: `ceos-ard validate`
-- With traditional setup: `ceos-ard validate`
+```bash
+ceos-ard validate
+```
 
-If pandoc is installed, this also checks the content (raw HTML, attributes, metadata, links and images),
-as `ceos-ard generate` does.
+Checks the template, the document sections, all PFSes with the building blocks they use, and the IDs of the requirements.
+It also lists the building blocks that no PFS uses.
 
-Check `ceos-ard validate --help` (or `ceos-ard validate --help`) for more details.
+If pandoc is available, the content is checked as well (see [Content rules](#content-rules)), as `generate` does.
 
-### `ceos-ard check-changes`: Check for missing changelog entries
+### `check-changes`
 
-To check that all building blocks that have been changed compared to a git branch have a new entry in their `changes`, run:
+```bash
+ceos-ard check-changes --base main
+```
 
-- With Pixi: `ceos-ard check-changes --base main`
-- With traditional setup: `ceos-ard check-changes --base main`
+Fails if a building block was changed without a new entry in its `changes`. Made for CI, requires git.
 
-The working tree is compared against the merge base of the given git ref and `HEAD`.
-Files that only differ in `changes` or `history` don't need a new entry.
-Requires that git is installed. The command exits with a non-zero exit code if entries are missing, so it can be used in CI.
+- The working tree is compared against the merge base of the given git ref and `HEAD`.
+- Files that only differ in `changes` or `history` need no new entry.
 
-Check `ceos-ard check-changes --help` for more details.
+## Document history
 
-### Document History
+The documents can list what changed between the releases of a PFS. This is off by default, as it needs the git history and the releases:
 
-By default, the generated documents don't include the document history as compiling it requires the git history and network access.
-Pass `--history` to `ceos-ard compile`, `ceos-ard generate`, or `ceos-ard generate-all` to compile it, e.g. `ceos-ard generate ST --history --stable`.
-The input directory must be a git checkout with the full history and the release tags (e.g. `fetch-depth: 0` for `actions/checkout`, or `git fetch --tags` locally).
+```bash
+ceos-ard generate ST --history --stable
+```
 
-The document history is compiled from the `changes` of the PFS document and of all building blocks that are used by the PFS.
-The changes are grouped by the GitHub releases of the PFS (tags `<PFS>-v<major>.<minor>.<patch>`), draft releases and pre-releases are ignored.
-As releases are always created from main, a change is part of a release if the commit that merged it into main
-(the first commit in the first-parent history of `HEAD` that contains the change) is an ancestor of the release tag.
+**Requirements**
+
+- The input folder is a git checkout with the full history and the release tags, e.g. `fetch-depth: 0` for `actions/checkout`, or `git fetch --tags` locally.
+- The releases are read from GitHub (`ceos-org/ceos-ard`, or the repository given with `--github-repo`). Set the `GITHUB_TOKEN` environment variable to avoid rate limits.
+- With `--offline`, the releases are read from the git tags instead, which needs no network access. The dates are then the ones of the tags, and pre-releases are listed, too.
+
+**What is listed**
+
+- The `changes` of the PFS document and of all building blocks that the PFS uses, as one table per version with one row per building block.
+- Versions are the GitHub releases of the PFS (tags `<PFS>-v<major>.<minor>.<patch>`). Draft releases and pre-releases are ignored.
+- Only the versions back to the previous major version. If older versions exist, the document history refers to them.
+- Only minor and major changes. Pass `--patch-changes` to also list patch-level (editorial) changes; they always count for the change level of a version.
+- For each release, only the building blocks that were part of the PFS in that release, including their glossary terms. Renamed files are followed, and deleted ones are read from the release tag.
+- Changes that are not released yet, under the draft version, together with the next version number they suggest.
+
+**How changes are assigned to releases**
+
+Releases are created from `main`. A change belongs to a release if the commit that merged it into `main` is an ancestor of the release tag.
 Edited changes and changes in renamed files keep their original commit.
-Changes that are not part of a release are listed for the draft version, together with the next version number that the changes suggest.
-This also applies if the version of the PFS document has been released already.
-Only the changes back to the previous major version are listed.
-Patch-level (editorial) changes are not listed, pass `--patch-changes` to list them as well.
-They are still considered for the change level of a version and the proposed next version number.
-For each of these releases, only the changes of building blocks that were part of the PFS in that release are listed,
-including the glossary terms that were referenced by them and following renamed files.
-Building blocks that have been deleted since are read from the release tag.
 
-If `HEAD` has a release tag for the PFS, its version must match the version of the PFS document.
+**Special cases**
 
-If no release exists on GitHub yet, no document history is generated.
-If versions before the oldest listed version exist (e.g. legacy documents before the first GitHub release), the document history refers to them.
-Combined documents never include a document history.
+- If `HEAD` has a release tag for the PFS, its version must match the version of the PFS document.
+- A new PFS (up to version 1.0.0) without a release has no document history.
+- A PFS above version 1.0.0 without a release (e.g. with legacy documents only) lists all recorded changes for the current version.
+- Combined documents never have a document history.
 
-The history is rendered as a table per version with one row per building block (document first, then sections, requirements and glossary terms in document order), listing its changes from the oldest to the newest and the highest change level. As Markdown tables can't contain lists or multiple paragraphs, the template emits the rows as fenced divs and the CLI's pandoc Lua filter `changelog-table.lua` converts them into a table.
+## Content rules
 
-The releases are read from the GitHub repository `ceos-org/ceos-ard`, which can be changed with `--github-repo`.
-A GitHub token can be provided through the `GITHUB_TOKEN` environment variable to avoid rate limits.
+The building blocks are written by many people, so the CLI limits what their content can do.
+Content that breaks a rule fails `generate` and `validate` with a list of all problems and the building block each one is in.
+
+**Links** must
+
+- use one of the schemes `http`, `https`, `mailto`, `ftp`, `ftps`, `sftp` or `s3`,
+- point to an anchor (e.g. `#sec:x`), or
+- point to an existing file in the `assets` folder, the only folder that is published with the documents.
+
+This also applies to the bibliography, e.g. `url` fields. A link like `www.example.com` without `https://` is refused.
+
+**Images** must be existing files in the `assets` folder or `data:` URIs.
+
+**Not allowed**
+
+- Raw HTML and other raw output (e.g. ` ```{=html} `), except for HTML comments.
+- Attributes other than `width` and `height` (e.g. `{width=50%}` on an image), and `label`, `columns` and `widths`, which the template uses.
+- Metadata other than the front matter of `template.md`, so the content can't add e.g. `css`.
+- IDs and `@title:` references that point outside of the input folder.
+- Symbolic links in the input folder. Only top-level folders that start with a dot (e.g. `.venv`) and `node_modules` may contain links.
+
+**While generating**
+
+- The Markdown template is rendered in Jinja's sandbox, so it can't reach Python internals or change the data.
+- Only the pandoc Lua filters of the CLI are used, not filters from the input folder.
+- Chromium renders the PDF without JavaScript and only loads files from the output folder.
 
 ## Templates
 
 The layout of the documents is part of the CLI, see the [templates](ceos_ard_cli/templates) folder:
 the Markdown template, the pandoc templates for HTML and Word, and the header and footer of the PDF.
-A file with the same name in the `templates` folder of the input directory replaces the built-in one.
-The pandoc Lua filters in the [filters](ceos_ard_cli/filters) folder can't be replaced.
-The Markdown template is rendered in Jinja's sandbox, so it can't reach Python internals or change the data.
 
-The texts that all PFSes share are read from Markdown files in `sections/document` of the input directory:
+- A file with the same name in the `templates` folder of the input folder replaces the built-in one.
+  Replaced HTML, Word and PDF templates are trusted and not checked.
+- The pandoc Lua filters in the [filters](ceos_ard_cli/filters) folder can't be replaced.
+- A `::: {#toc}` div in the Markdown template is replaced by a table of contents of the headings that follow it.
 
-- `draft.md`: shown at the top of draft versions
-- `status.md`: the document status
-- `definition.md`: the CEOS-ARD definition
-- `introduction.md`: the introduction before the introductory sections of the PFS
+The texts that all PFSes share are Markdown files in `sections/document` of the input folder:
 
-Each file starts with a heading (of any level), which becomes the section title, followed by plain Markdown.
-The texts can't use template variables and follow the same rules as the Markdown in the YAML files, e.g. no raw HTML.
+| File | Text |
+| --- | --- |
+| `draft.md` | Shown at the top of draft versions |
+| `status.md` | The document status |
+| `definition.md` | The CEOS-ARD definition |
+| `introduction.md` | The introduction before the introductory sections of the PFS |
+
+Each file starts with a heading of any level, which becomes the section title, followed by plain Markdown.
+The texts follow the [content rules](#content-rules) and can't use template variables.
 A missing file leaves its text out of the documents.
 
 ## Development
 
-1. Fork this repository if you plan to change the code or create pull requests.
-2. Clone either your forked repository or this repository, e.g. `git clone https://github.com/ceos-org/ceos-ard-cli`
-3. Switch into the newly created folder: `cd ceos-ard-cli`
-4. Follow the [Installation instructions above](#installation)
-5. Install dependencies and set up the development environment: `pixi run -e dev install-dev`
-6. Switch into the development envionment: `pixi shell -e dev`
-7. You can now run the CLI in development mode as normal.
-8. Run the checks (lint, format, tests) through `pixi run check-all`
-9. Optionally, you can install pre-commit hooks (`pre-commit install`) to run lint and format automatically for each commit.
+1. Fork and clone the repository, then follow the [installation](#install).
+2. Activate the development environment: `pixi shell -e dev`
+3. Change the code. The CLI is installed in editable mode, so `ceos-ard` runs your changes.
+4. Run the linter, the formatter and the tests: `pixi run -e dev check-all`
+
+Optionally, run `pre-commit install` to lint and format on each commit.
