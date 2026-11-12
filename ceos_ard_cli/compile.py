@@ -1,17 +1,23 @@
 import bisect
 import copy
+import logging
 import re
 from collections import defaultdict
 from pathlib import Path
+
+from dirsync import sync
 
 from .changelog import DEFAULT_GITHUB_REPO, compile_changelog
 from .links import resolve_links, resolve_titles
 from .problems import MultipleErrors, deprecation, report
 from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.deprecation import describe, find_deprecated_blocks
-from .utils.files import check_no_symlinks, content_file, read_file, sync_assets, write_file
+from .utils.files import check_no_symlinks, content_file, fix_path, read_file, write_file
 from .utils.pfs import read_pfs
 from .utils.template import read_document_sections, read_template
+
+# Marks an assets folder in the output as a copy made by the CLI, which may be purged
+ASSETS_MARKER = ".ceos-ard-cli"
 
 OUTPUT_EXTENSIONS = [".md", ".bib", ".docx", ".html", ".pdf"]
 
@@ -353,20 +359,55 @@ def read_data(pfs: list[str], input_dir: Path, stable: bool = False, metadata: d
     return data
 
 
+def sync_assets(source: Path, target: Path, debug: bool = False):
+    """Makes `target` a copy of `source`: copies new and changed files, removes all others."""
+    marker = target / ASSETS_MARKER
+    if target.is_dir() and any(target.iterdir()) and not marker.is_file():
+        raise ValueError(
+            f"'{fix_path(target)}' was not created by the CLI and its files would be removed: "
+            "choose another output folder or remove it"
+        )
+    target.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+
+    logger = logging.getLogger("ceos_ard_cli.dirsync")
+    logger.handlers.clear()
+    logger.propagate = False
+    logger.addHandler(logging.StreamHandler() if debug else logging.NullHandler())
+    logger.setLevel(logging.INFO if debug else logging.CRITICAL)
+    sync(
+        str(source),
+        str(target),
+        "sync",
+        create=True,
+        purge=True,
+        content=True,
+        ignore=[re.escape(ASSETS_MARKER) + "$"],
+        logger=logger,
+    )
+
+
 def prepare(
-    pfs: list[str], out: Path | str, input_dir: Path | str, stable: bool = False, metadata: dict = {}
+    pfs: list[str],
+    out: Path | str,
+    input_dir: Path | str,
+    stable: bool = False,
+    metadata: dict = {},
+    debug: bool = False,
 ) -> tuple[dict, Path]:
     """The part of a compilation that the editable and the read-only document share:
     checks the input folder, copies the assets and reads the data. Returns the data and the name of the document."""
     check_no_symlinks(input_dir)
-    out = Path(out).resolve()
-    out.parent.mkdir(parents=True, exist_ok=True)
-    # The documents link to the assets relative to the output folder
+    out = Path(out)
+    folder = out.parent
+    # create folder if needed
+    folder.mkdir(parents=True, exist_ok=True)
+    # sync assets (copy new/changed files, remove stale ones)
+    assets_target = folder.resolve() / "assets"
     input_dir = Path(input_dir).resolve()
     assets_source = input_dir / "assets"
-    assets_target = out.parent / "assets"
     if assets_source != assets_target:
-        sync_assets(assets_source, assets_target)
+        sync_assets(assets_source, assets_target, debug)
 
     try:
         data = read_data(pfs, input_dir, stable, metadata)
@@ -419,7 +460,7 @@ def compile(
     if isinstance(pfs, str):
         pfs = [pfs]
 
-    data, out = prepare(pfs, out, input_dir, stable, metadata)
+    data, out = prepare(pfs, out, input_dir, stable, metadata, debug)
     compile_files(
         data,
         out,
