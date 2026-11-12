@@ -392,7 +392,7 @@ def compile(
         data = read_data(pfs, input_dir, stable, metadata)
 
         if stable:
-            out = out.parent / f"{out.stem}-v{data['version']}"
+            out = out.with_name(f"{out.name}-v{data['version']}")
 
         # write a json file for debugging
         if debug:
