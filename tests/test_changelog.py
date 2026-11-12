@@ -21,6 +21,7 @@ from ceos_ard_cli.changelog import (
     parse_version,
     replaced_glossaries,
 )
+from ceos_ard_cli.problems import collect
 
 
 def change(day, level, text="Changed something", reason="Because", author="Jane Doe"):
@@ -490,6 +491,23 @@ class TestBuildChangelog:
         files = {"requirements/per-pixel/snow-ice-sr.yaml": SNOW_ICE}
         result = build(data, [release("5.0.1", "2026-05-27")], tmp_path, members, files)
         assert [e["change"] for e in entries(result, "5.0.1")] == ["Old change"]
+
+    @pytest.mark.parametrize("deleted, source", [(False, {"file": "requirements/a.yaml"}), (True, {"pfs": "ST"})])
+    def test_broken_former_member_is_reported(self, tmp_path, deleted, source):
+        files = {}
+        if deleted:
+            files["requirements/a.yaml"] = "id: [a\n"
+        else:
+            (tmp_path / "requirements").mkdir()
+            (tmp_path / "requirements/a.yaml").write_text("id: [a\n", encoding="utf-8")
+        data = pfs_document(tmp_path, "6.0.0", changes=[change("2026-08-14", "major")])
+        members = {"ST-v5.0.1": {"pfs/ST/document.yaml", "requirements/a.yaml"}}
+
+        with collect() as problems:
+            build(data, [release("5.0.1", "2026-05-27")], tmp_path, members, files)
+
+        assert [p.to_dict() | {"message": ""} for p in problems] == [source | {"severity": "warning", "message": ""}]
+        assert problems[0].message.startswith("Can't read the changes of the former building block requirements/a.yaml")
 
     def test_changes_after_the_release_of_the_current_version(self, tmp_path, capsys):
         data = pfs_document(

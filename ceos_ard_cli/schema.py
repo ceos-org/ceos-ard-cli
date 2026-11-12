@@ -6,15 +6,15 @@ from strictyaml import (
     Map,
     MapPattern,
     Optional,
-    Regex,
     Seq,
     Str,
-    UniqueSeq,
 )
 
+from .strictyaml.date import Date
 from .strictyaml.id_reference import IdReference
 from .strictyaml.markdown import Markdown
 from .strictyaml.single_line import SingleLine
+from .strictyaml.unique_seq import UniqueSeq
 from .utils.files import fix_path
 
 REFERENCE_PATH = "./references/{id}.bib"
@@ -52,7 +52,7 @@ _SECTION_DEPS = lambda base_path: _DEPS(SECTION_PATH, base_path, SECTION)
 
 _REQUIREMENT_PART = Map(
     {
-        "description": Markdown(),
+        "description": Markdown(allow_empty=False),
         Optional("notes", default=[]): EmptyList() | Seq(Markdown()),
         Optional("metadata", default={}): EmptyDict(),  # todo: add metadata schema
         Optional("optional", default=False): Bool(),
@@ -80,9 +80,9 @@ def get_empty_requirement_part():
 _CHANGES = EmptyList() | Seq(
     Map(
         {
-            "date": Regex(r"\d{4}-\d{2}-\d{2}"),  # ISO date format
+            "date": Date(),
             "author": Str(),
-            "change": Markdown(),
+            "change": Markdown(allow_empty=False),
             "reason": Str(),
             "level": Enum(["major", "minor", "patch"]),
         }
@@ -93,7 +93,7 @@ GLOSSARY = lambda file, base_path: Map(
     {
         Optional("filepath", default=fix_path(file)): Str(),
         "term": SingleLine(),
-        "description": Markdown(),
+        "description": Markdown(allow_empty=False),
         Optional("references", default=[]): _REFERENCE_IDS(base_path),
         Optional("changes", default=[]): _CHANGES,
         Optional("remarks", default=""): Markdown(),
@@ -107,7 +107,7 @@ SECTION = lambda file, base_path: Map(
         Optional("filepath", default=fix_path(file)): Str(),
         Optional("id", default=""): Str(),
         "title": SingleLine(),
-        "description": Markdown(),
+        "description": Markdown(allow_empty=False),
         Optional("dependencies", default={}): _REQUIREMENT_DEPS(base_path),
         Optional("sections", default={}): _SECTION_DEPS(base_path),
         Optional("glossary", default=[]): _RESOLVED_GLOSSARY(base_path),
