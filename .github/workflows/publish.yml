@@ -1,11 +1,3 @@
-# This workflow will upload a Python Package using Twine when a release is created
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
-
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
 name: Upload Python Package
 
 on:
@@ -17,11 +9,15 @@ permissions:
 
 jobs:
   deploy:
-
     runs-on: ubuntu-latest
-
+    environment: pypi
+    permissions:
+      # for PyPI's trusted publishing
+      id-token: write
     steps:
     - uses: actions/checkout@v7
+    - name: Compare the tag with the version
+      run: test "v$(sed -nE 's/^__version__ = "(.*)"$/\1/p' ceos_ard_cli/version.py)" = "$GITHUB_REF_NAME"
     - uses: prefix-dev/setup-pixi@v0.11.3
       with:
         pixi-version: v0.49.0
@@ -32,6 +28,3 @@ jobs:
       run: pixi run -e dev build
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_API_TOKEN }}
