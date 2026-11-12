@@ -1801,8 +1801,8 @@ packages:
   timestamp: 1792772446739
 - pypi: ./
   name: ceos-ard-cli
-  version: 0.6.1
-  sha256: 03e260ad68c2d440ef6baac9b72286523eb55948a290c8abb9921a086ef409bc
+  version: 0.7.0
+  sha256: e18a87d8d65d75df01fd9f5e61dc952cb2f5531447d0835aa6d631895328f698
   requires_dist:
   - bibtexparser==2.0.0b9
   - click>=8.0.0,<9
