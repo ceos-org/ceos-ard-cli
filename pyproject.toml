@@ -54,8 +54,8 @@ platforms = ["win-64", "linux-64", "osx-64", "osx-arm64"]
 
 [tool.pixi.dependencies]
 python = ">=3.11"
-pandoc = "==3.8.2.1"
-pandoc-crossref = "==0.3.22"
+pandoc = "==3.13"
+pandoc-crossref = "==0.3.26"
 pip = "*"
 
 [tool.pixi.pypi-dependencies]
