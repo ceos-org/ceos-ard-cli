@@ -41,6 +41,21 @@ class TestCLI:
         assert "--history" in result.output
         assert "--github-repo" in result.output
         assert "--patch-changes" in result.output
+        assert "--offline" in result.output
+
+    @pytest.mark.parametrize("command", ["compile", "generate"])
+    def test_pfs_is_required(self, command):
+        result = CliRunner().invoke(cli, [command])
+
+        assert result.exit_code == 2
+        assert "Missing argument" in result.output
+
+    @pytest.mark.parametrize("command", [["compile", "SR"], ["generate-all"]])
+    def test_input_must_be_a_content_folder(self, command, tmp_path):
+        result = CliRunner().invoke(cli, [*command, "-i", str(tmp_path), "-o", str(tmp_path / "out" / "x")])
+
+        assert result.exit_code == 1
+        assert "has no 'pfs' folder" in result.output
 
     def test_check_changes_help(self):
         runner = CliRunner()

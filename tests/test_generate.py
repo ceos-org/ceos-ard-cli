@@ -151,3 +151,19 @@ def test_failed_stable_compilations_keep_all_files_without_a_version(tmp_path, f
         module.compile("SR", tmp_path / "out" / "SR", tmp_path, stable=True)
 
     assert (tmp_path / "out" / "SR.html").is_file()
+
+
+def test_stable_documents_keep_dots_in_their_name(tmp_path, failing_compile, monkeypatch):
+    module, _ = failing_compile
+    monkeypatch.setattr(module, "compile_bibtex", lambda *args, **kwargs: None)
+
+    assert module.compile("SR", tmp_path / "out" / "SR-1.5", tmp_path, stable=True).name == "SR-1.5-v1.0.0"
+
+
+@pytest.mark.parametrize("pfs", ["../requirements", "a/b", "a\\b", "..", ""])
+def test_pfs_must_be_a_folder_name(tmp_path, pfs):
+    from ceos_ard_cli.utils.pfs import read_pfs
+
+    write(tmp_path / "requirements" / "document.yaml", "title: Secret\n")
+    with pytest.raises(ValueError, match="Invalid PFS"):
+        read_pfs(pfs, tmp_path)
