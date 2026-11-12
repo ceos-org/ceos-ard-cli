@@ -324,9 +324,12 @@ def validate(input_dir):
     """
     print(f"CEOS-ARD CLI {__version__} - Validate building blocks\n")
     try:
-        validate_(input_dir)
+        errors = validate_(input_dir)
     except Exception as e:
         print(e)
+        sys.exit(1)
+    if errors:
+        print(f"\nFound {errors} error(s)")
         sys.exit(1)
 
 

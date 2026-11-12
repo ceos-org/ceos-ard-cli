@@ -19,9 +19,10 @@ CHECK_FILTERS = ["links.lua"]
 CHECK_TIMEOUT = 60
 
 
-def log(id, error=None):
+def log(id, error=None) -> bool:
     message = str(error) if error is not None else "OK"
     print(f"- {id}: {message}")
+    return error is not None
 
 
 def check_content(markdown: str, input_dir: Path, bibtex: str = "") -> list[str]:
@@ -73,8 +74,9 @@ def check_rendering(data: dict, input_dir: Path) -> list[str]:
     return errors
 
 
-def validate(input_dir):
+def validate(input_dir) -> int:
     input_dir = Path(input_dir).resolve()
+    errors = 0
     print("Checking for symbolic links")
     error = None
     try:
@@ -82,10 +84,10 @@ def validate(input_dir):
     except Exception as e:
         error = e
     finally:
-        log("content folder", error)
+        errors += log("content folder", error)
     if error is not None:
         # The other checks would read the files the links point to
-        return
+        return errors
 
     # Validate PFS template
     print("Validating PFS template")
@@ -95,7 +97,7 @@ def validate(input_dir):
     except Exception as e:
         error = e
     finally:
-        log("templates/template.md", error)
+        errors += log("templates/template.md", error)
 
     print("Validating document sections")
     try:
@@ -117,7 +119,7 @@ def validate(input_dir):
         except Exception as e:
             error = e
         finally:
-            log(fix_path(Path(path)), error)
+            errors += log(fix_path(Path(path)), error)
 
     # Validate all PFS
     # This also validates all files that are used/referenced in the PFS
@@ -146,7 +148,7 @@ def validate(input_dir):
         except Exception as e:
             error = e
         finally:
-            log(pfs, error)
+            errors += log(pfs, error) + len(link_errors) + len(render_errors)
             for message in link_errors:
                 print(f"  - ERROR: {message}")
             for message in render_errors:
@@ -181,11 +183,12 @@ def validate(input_dir):
                 continue
             req_id = data.get("id")
             if not req_id:
-                log(rel_path, "missing id")
+                errors += log(rel_path, "missing id")
                 continue
             if req_id in ids:
-                log(rel_path, f"duplicate id '{req_id}' (also in {ids[req_id]})")
+                errors += log(rel_path, f"duplicate id '{req_id}' (also in {ids[req_id]})")
             else:
                 ids[req_id] = rel_path
         except Exception as e:
-            log(rel_path, e)
+            errors += log(rel_path, e)
+    return errors
