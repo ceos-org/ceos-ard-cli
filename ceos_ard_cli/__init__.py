@@ -7,8 +7,73 @@ from .check_changes import check_changes as check_changes_
 from .compile import compile as compile_
 from .generate import generate as generate_
 from .generate import generate_all as generate_all_
+from .utils.pfs import check_input
 from .validate import validate as validate_
 from .version import __version__
+
+
+def options(*decorators):
+    """Combines options that several commands share into a single decorator."""
+
+    def decorate(command):
+        for decorator in reversed(decorators):
+            command = decorator(command)
+        return command
+
+    return decorate
+
+
+input_dir_option = click.option(
+    "--input-dir",
+    "-i",
+    default=".",
+    help="Input directory for PFS files, defaults to the current folder",
+)
+output_file_option = click.option(
+    "--output",
+    "-o",
+    default=None,
+    help="Output file without file extension, defaults to the name of the given PFS",
+)
+stable_option = click.option(
+    "--stable",
+    "-r",
+    is_flag=True,
+    default=False,
+    help="Removes the '-draft' suffix from the version number, e.g. 0.1.0-draft becomes 0.1.0",
+)
+format_options = options(
+    click.option("--self-contained", "-s", is_flag=True, default=False, help="Generate self-contained HTML files"),
+    click.option("--pdf", is_flag=True, default=False, help="If provided, disables PDF generation"),
+    click.option("--docx", is_flag=True, default=False, help="If provided, disables Word (docx) generation"),
+)
+history_options = options(
+    click.option(
+        "--history",
+        is_flag=True,
+        default=False,
+        help="Compiles the document history from the changes of all building blocks, grouped by GitHub release. "
+        "Requires a git checkout with the full history and network access, "
+        "a GitHub token can be provided via the GITHUB_TOKEN environment variable.",
+    ),
+    click.option(
+        "--github-repo",
+        default=DEFAULT_GITHUB_REPO,
+        show_default=True,
+        help="The GitHub repository (owner/name) to read the releases from for the document history",
+    ),
+    click.option(
+        "--patch-changes",
+        is_flag=True,
+        default=False,
+        help="Also lists the patch-level (editorial) changes in the document history",
+    ),
+)
+
+
+def fail(error):
+    print(error)
+    sys.exit(1)
 
 
 @click.group()
@@ -21,19 +86,9 @@ def cli():
 
 
 @click.command()
-@click.argument("pfs", nargs=-1)
-@click.option(
-    "--output",
-    "-o",
-    default=None,
-    help="Output file without file extension, defaults to the name of the given PFS",
-)
-@click.option(
-    "--input-dir",
-    "-i",
-    default=".",
-    help="Input directory for PFS files, defaults to the current folder",
-)
+@click.argument("pfs", nargs=-1, required=True)
+@output_file_option
+@input_dir_option
 @click.option(
     "--editable",
     "-e",
@@ -41,155 +96,42 @@ def cli():
     default=False,
     help="Adds an 'Assessment' section to the requirements (for editable Word documents)",
 )
-@click.option(
-    "--stable",
-    "-r",
-    is_flag=True,
-    default=False,
-    help="Removes the '-draft' suffix from the version number, e.g. 0.1.0-draft becomes 0.1.0",
-)
+@stable_option
 @click.option(
     "--debug",
     is_flag=True,
     default=False,
     help="Enables debugging mode, e.g. outputs a JSON file for debugging purposes and gives a stacktrace",
 )
-@click.option(
-    "--history",
-    is_flag=True,
-    default=False,
-    help="Compiles the document history from the changes of all building blocks, grouped by GitHub release. "
-    "Requires a git checkout with the full history and network access, "
-    "a GitHub token can be provided via the GITHUB_TOKEN environment variable.",
-)
-@click.option(
-    "--github-repo",
-    default=DEFAULT_GITHUB_REPO,
-    show_default=True,
-    help="The GitHub repository (owner/name) to read the releases from for the document history",
-)
-@click.option(
-    "--patch-changes",
-    is_flag=True,
-    default=False,
-    help="Also lists the patch-level (editorial) changes in the document history",
-)
-def compile(pfs, output, input_dir, editable, stable, debug, history, github_repo, patch_changes):
+@history_options
+def compile(pfs, output, input_dir, editable, stable, debug, **history):
     """
     Compiles the Markdown file for the given PFS.
     """
     pfs = list(pfs)
     print(f"CEOS-ARD CLI {__version__} - Compile {' + '.join(pfs)} as Markdown\n")
 
-    if not output:
-        output = "-".join(pfs)
-
     try:
-        compile_(
-            pfs,
-            output,
-            input_dir,
-            editable=editable,
-            stable=stable,
-            debug=debug,
-            history=history,
-            github_repo=github_repo,
-            patch_changes=patch_changes,
-        )
+        check_input(input_dir, pfs)
+        compile_(pfs, output or "-".join(pfs), input_dir, editable=editable, stable=stable, debug=debug, **history)
     except Exception as e:
         if debug:
-            raise e
-        else:
-            print(e)
-            sys.exit(1)
+            raise
+        fail(e)
 
 
 @click.command()
-@click.argument("pfs", nargs=-1)
-@click.option(
-    "--output",
-    "-o",
-    default=None,
-    help="Output file without file extension, defaults to the name of the given PFS",
-)
-@click.option(
-    "--input-dir",
-    "-i",
-    default=".",
-    help="Input directory for PFS files, defaults to the current folder",
-)
-@click.option(
-    "--self-contained",
-    "-s",
-    is_flag=True,
-    default=False,
-    help="Generate self-contained HTML files",
-)
-@click.option("--pdf", is_flag=True, default=False, help="If provided, disables PDF generation")
-@click.option("--docx", is_flag=True, default=False, help="If provided, disables Word (docx) generation")
-@click.option(
-    "--stable",
-    "-r",
-    is_flag=True,
-    default=False,
-    help="Removes the '-draft' suffix from the version number, e.g. 0.1.0-draft becomes 0.1.0",
-)
-@click.option(
-    "--id",
-    default=None,
-    help="Overrides the ID of the document",
-)
-@click.option(
-    "--title",
-    default=None,
-    help="Overrides the title of the document",
-)
-@click.option(
-    "--version",
-    default=None,
-    help="Overrides the version number of the document",
-)
-@click.option(
-    "--pfs-type",
-    default=None,
-    help="Overrides the PFS type of the document",
-)
-@click.option(
-    "--history",
-    is_flag=True,
-    default=False,
-    help="Compiles the document history from the changes of all building blocks, grouped by GitHub release. "
-    "Requires a git checkout with the full history and network access, "
-    "a GitHub token can be provided via the GITHUB_TOKEN environment variable.",
-)
-@click.option(
-    "--github-repo",
-    default=DEFAULT_GITHUB_REPO,
-    show_default=True,
-    help="The GitHub repository (owner/name) to read the releases from for the document history",
-)
-@click.option(
-    "--patch-changes",
-    is_flag=True,
-    default=False,
-    help="Also lists the patch-level (editorial) changes in the document history",
-)
-def generate(
-    pfs,
-    output,
-    input_dir,
-    self_contained,
-    pdf,
-    docx,
-    stable,
-    id,
-    title,
-    version,
-    pfs_type,
-    history,
-    github_repo,
-    patch_changes,
-):
+@click.argument("pfs", nargs=-1, required=True)
+@output_file_option
+@input_dir_option
+@format_options
+@stable_option
+@click.option("--id", default=None, help="Overrides the ID of the document")
+@click.option("--title", default=None, help="Overrides the title of the document")
+@click.option("--version", default=None, help="Overrides the version number of the document")
+@click.option("--pfs-type", default=None, help="Overrides the PFS type of the document")
+@history_options
+def generate(pfs, output, input_dir, self_contained, pdf, docx, stable, id, title, version, pfs_type, **history):
     """
     Generates the Word and HTML files for the given PFS.
 
@@ -198,33 +140,13 @@ def generate(
     pfs = list(pfs)
     print(f"CEOS-ARD CLI {__version__} - Generate {' + '.join(pfs)}\n")
 
-    if not output:
-        output = id or "-".join(pfs)
-
-    metadata = {
-        "id": id,
-        "title": title,
-        "version": version,
-        "type": pfs_type,
-    }
-
+    metadata = {"id": id, "title": title, "version": version, "type": pfs_type}
+    output = output or id or "-".join(pfs)
     try:
-        generate_(
-            pfs,
-            output,
-            input_dir,
-            self_contained,
-            pdf,
-            docx,
-            stable,
-            metadata,
-            history=history,
-            github_repo=github_repo,
-            patch_changes=patch_changes,
-        )
+        check_input(input_dir, pfs)
+        generate_(pfs, output, input_dir, self_contained, pdf, docx, stable, metadata, **history)
     except Exception as e:
-        print(e)
-        sys.exit(1)
+        fail(e)
 
 
 @click.command()
@@ -234,81 +156,31 @@ def generate(
     default=".",
     help="Output directory for PFS files, defaults to the current folder",
 )
-@click.option(
-    "--input-dir",
-    "-i",
-    default=".",
-    help="Input directory for PFS files, defaults to the current folder",
-)
-@click.option(
-    "--self-contained",
-    "-s",
-    is_flag=True,
-    default=False,
-    help="Generate self-contained HTML files",
-)
-@click.option("--pdf", is_flag=True, default=False, help="If provided, disables PDF generation")
-@click.option("--docx", is_flag=True, default=False, help="If provided, disables Word (docx) generation")
+@input_dir_option
+@format_options
 @click.option(
     "--pfs",
     "-p",
     multiple=True,
     help="PFS to generate, if not specified all PFS will be generated",
 )
-@click.option(
-    "--stable",
-    "-r",
-    is_flag=True,
-    default=False,
-    help="Removes the '-draft' suffix from the version number, e.g. 0.1.0-draft becomes 0.1.0",
-)
-@click.option(
-    "--history",
-    is_flag=True,
-    default=False,
-    help="Compiles the document history from the changes of all building blocks, grouped by GitHub release. "
-    "Requires a git checkout with the full history and network access, "
-    "a GitHub token can be provided via the GITHUB_TOKEN environment variable.",
-)
-@click.option(
-    "--github-repo",
-    default=DEFAULT_GITHUB_REPO,
-    show_default=True,
-    help="The GitHub repository (owner/name) to read the releases from for the document history",
-)
-@click.option(
-    "--patch-changes",
-    is_flag=True,
-    default=False,
-    help="Also lists the patch-level (editorial) changes in the document history",
-)
-def generate_all(output, input_dir, self_contained, pdf, docx, pfs, stable, history, github_repo, patch_changes):
+@stable_option
+@history_options
+def generate_all(output, input_dir, self_contained, pdf, docx, pfs, stable, **history):
     """
     Generates all files for all PFS.
 
     Requires that pandoc is installed.
     """
     print(f"CEOS-ARD CLI {__version__} - Generate all PFS\n")
-    pfs = list(pfs) if pfs is not None else []
     try:
-        errors = generate_all_(
-            output,
-            input_dir,
-            self_contained,
-            pdf,
-            docx,
-            pfs,
-            stable,
-            history=history,
-            github_repo=github_repo,
-            patch_changes=patch_changes,
-        )
-        print()
-        print(f"Done with {errors} errors")
-        sys.exit(errors)
+        check_input(input_dir, pfs)
+        errors = generate_all_(output, input_dir, self_contained, pdf, docx, list(pfs), stable, **history)
     except Exception as e:
-        print(e)
-        sys.exit(1)
+        fail(e)
+    print()
+    print(f"Done with {errors} errors")
+    sys.exit(1 if errors else 0)
 
 
 @click.command()
