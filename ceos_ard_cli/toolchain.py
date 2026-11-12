@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 import subprocess
@@ -8,6 +9,8 @@ from pathlib import Path
 PACKAGE = Path(__file__).parent
 PACKAGE_NAME = "ceos-ard-cli"
 TOOLS = ["pandoc", "pandoc-crossref"]
+# Set to skip the checks where the environment is known to be right, e.g. on a server
+SKIP_CHECK = "CEOS_ARD_SKIP_TOOL_CHECK"
 
 
 @cache
@@ -41,6 +44,8 @@ def installed_version(tool: str) -> str | None:
 @cache
 def check_tools() -> None:
     """Fails without the tools that generate the documents and warns about versions the CLI isn't tested with."""
+    if os.environ.get(SKIP_CHECK):
+        return
     missing = [tool for tool in TOOLS if not shutil.which(tool)]
     if missing:
         raise ValueError(f"{' and '.join(missing)} not found: run the CLI in its pixi environment, see the README")
