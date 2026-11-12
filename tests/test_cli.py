@@ -62,3 +62,23 @@ class TestCLI:
 
         assert result.exit_code == 0
         assert "--base" in result.output
+
+    @pytest.mark.parametrize(
+        ("command", "message"),
+        [
+            (["compile", "../requirements"], "Invalid PFS '../requirements'"),
+            (["generate", "TYPO"], "Unknown PFS 'TYPO', expected one of: SR"),
+            (["generate-all", "--pfs", "TYPO"], "Unknown PFS 'TYPO', expected one of: SR"),
+        ],
+    )
+    def test_pfs_are_checked_before_anything_is_written(self, command, message, tmp_path):
+        (tmp_path / "content" / "pfs" / "SR").mkdir(parents=True)
+        (tmp_path / "content" / "assets").mkdir()
+        (tmp_path / "requirements.md").write_text("theirs", encoding="utf-8")
+        output = [] if command[0] == "compile" else ["-o", str(tmp_path / "out" / "x")]
+
+        result = CliRunner().invoke(cli, [*command, "-i", str(tmp_path / "content"), *output])
+
+        assert result.exit_code == 1
+        assert message in result.output
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["content", "requirements.md"]
