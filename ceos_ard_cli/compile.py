@@ -10,9 +10,12 @@ from .links import resolve_links, resolve_titles
 from .problems import MultipleErrors, deprecation, report
 from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.deprecation import describe, find_deprecated_blocks
-from .utils.files import check_no_symlinks, content_file, read_file, write_file
+from .utils.files import check_no_symlinks, content_file, fix_path, read_file, write_file
 from .utils.pfs import read_pfs
 from .utils.template import read_document_sections, read_template
+
+# Marks an assets folder in the output as a copy made by the CLI, which may be purged
+ASSETS_MARKER = ".ceos-ard-cli"
 
 OUTPUT_EXTENSIONS = [".md", ".bib", ".docx", ".html", ".pdf"]
 
@@ -356,6 +359,34 @@ def read_data(pfs: list[str], input_dir: Path, stable: bool = False, metadata: d
     return data
 
 
+def sync_assets(source: Path, target: Path, debug: bool = False):
+    """Makes `target` a copy of `source`: copies new and changed files, removes all others."""
+    marker = target / ASSETS_MARKER
+    if target.is_dir() and any(target.iterdir()) and not marker.is_file():
+        raise ValueError(
+            f"'{fix_path(target)}' was not created by the CLI and its files would be removed: "
+            "choose another output folder or remove it"
+        )
+    target.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+
+    logger = logging.getLogger("ceos_ard_cli.dirsync")
+    logger.handlers.clear()
+    logger.propagate = False
+    logger.addHandler(logging.StreamHandler() if debug else logging.NullHandler())
+    logger.setLevel(logging.INFO if debug else logging.CRITICAL)
+    sync(
+        str(source),
+        str(target),
+        "sync",
+        create=True,
+        purge=True,
+        content=True,
+        ignore=[re.escape(ASSETS_MARKER) + "$"],
+        logger=logger,
+    )
+
+
 def compile(
     pfs: list[str] | str,
     out: Path | str,
@@ -378,16 +409,11 @@ def compile(
     # create folder if needed
     folder.mkdir(parents=True, exist_ok=True)
     # sync assets (copy new/changed files, remove stale ones)
-    assets_target = folder / "assets"
+    assets_target = folder.resolve() / "assets"
     input_dir = Path(input_dir).resolve()
     assets_source = input_dir / "assets"
     if assets_source != assets_target:
-        logger = logging.getLogger("ceos_ard_cli.dirsync")
-        logger.handlers.clear()
-        logger.propagate = False
-        logger.addHandler(logging.StreamHandler() if debug else logging.NullHandler())
-        logger.setLevel(logging.INFO if debug else logging.CRITICAL)
-        sync(str(assets_source), str(assets_target), "sync", create=True, purge=True, content=True, logger=logger)
+        sync_assets(assets_source, assets_target, debug)
 
     data = None
     try:
