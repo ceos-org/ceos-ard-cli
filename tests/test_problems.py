@@ -6,7 +6,7 @@ import subprocess
 import pytest
 from click.testing import CliRunner
 
-from ceos_ard_cli import cli
+from ceos_ard_cli import cli, toolchain
 from ceos_ard_cli.compile import read_data
 from ceos_ard_cli.generate import run_pandoc
 from ceos_ard_cli.problems import MultipleErrors, Problem, collect, content_problem, report, to_problems
@@ -17,7 +17,9 @@ INVALID = "id: {id}\nrequirements:\n  threshold:\n    description: Text\n"
 
 
 @pytest.fixture(autouse=True)
-def empty_caches():
+def empty_caches(monkeypatch):
+    # The problems in the content, not the ones of the tools that generate the documents
+    monkeypatch.setenv(toolchain.SKIP_CHECK, "1")
     yaml.YAML_CACHE.clear()
     files.FILE_CACHE.clear()
 
