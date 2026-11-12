@@ -10,7 +10,6 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: pypi
     permissions:
       contents: read
       # for PyPI's trusted publishing
