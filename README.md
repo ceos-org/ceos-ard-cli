@@ -42,12 +42,15 @@ The CLI runs in a [Pixi](https://pixi.sh/) environment, which provides the versi
 
 ### Run
 
+In the `ceos-ard-cli` folder:
+
 ```bash
-cd ceos-ard-cli
 pixi shell                    # activates the environment
 cd ../ceos-ard                # the folder with the building blocks
 ceos-ard generate-all -o build
 ```
+
+Add `--pdf` to skip the PDFs if you didn't install the browser.
 
 ### GitHub Actions
 
@@ -119,6 +122,8 @@ ceos-ard compile SR
 ```
 
 Creates only the Markdown file (`SR.md`) and the bibliography (`SR.bib`) that the documents are generated from.
+
+Like `generate`, it also copies the `assets` folder next to the output file and removes all other files from that copy.
 
 | Option | Effect |
 | --- | --- |
