@@ -95,7 +95,7 @@ Creates `SR.html`, `SR.docx` and `SR.pdf` for the PFS in `pfs/SR`, together with
 | `-s`, `--self-contained` | Embeds images and styles into the HTML file |
 | `-r`, `--stable` | Removes the `-draft` suffix from the version and adds the version to the file name, e.g. `SR-v1.0.0.html` |
 | `--id`, `--title`, `--version`, `--pfs-type` | Override the metadata of the document |
-| `--history`, `--patch-changes`, `--github-repo` | See [Document history](#document-history) |
+| `--history`, `--patch-changes`, `--github-repo`, `--offline` | See [Document history](#document-history) |
 
 The HTML document is always created.
 
@@ -121,7 +121,7 @@ Runs `generate` for every PFS in the `pfs` folder.
 | --- | --- |
 | `-o`, `--output` | Output folder, defaults to the current folder |
 | `-p`, `--pfs` | Only generates the given PFS, can be repeated |
-| `--pdf`, `--docx`, `-s`, `-r`, `--history`, `--patch-changes`, `--github-repo` | As for `generate` |
+| `--pdf`, `--docx`, `-s`, `-r`, `--history`, `--patch-changes`, `--github-repo`, `--offline` | As for `generate` |
 
 ### `compile`
 
@@ -140,7 +140,7 @@ It fails if an `assets` folder with files exists there that the CLI didn't creat
 | `-e`, `--editable` | Adds an "Assessment" section to the requirements, as in the Word documents |
 | `-r`, `--stable` | As for `generate` |
 | `--debug` | Writes the data of the template as `SR.debug.json` and shows stack traces |
-| `--history`, `--patch-changes`, `--github-repo` | See [Document history](#document-history) |
+| `--history`, `--patch-changes`, `--github-repo`, `--offline` | See [Document history](#document-history) |
 
 ### `validate`
 
@@ -176,6 +176,7 @@ ceos-ard generate ST --history --stable
 
 - The input folder is a git checkout with the full history and the release tags, e.g. `fetch-depth: 0` for `actions/checkout`, or `git fetch --tags` locally.
 - The releases are read from GitHub (`ceos-org/ceos-ard`, or the repository given with `--github-repo`). Set the `GITHUB_TOKEN` environment variable to avoid rate limits.
+- With `--offline`, the releases are read from the git tags instead, which needs no network access. The dates are then the ones of the tags, and pre-releases are listed, too.
 
 **What is listed**
 
