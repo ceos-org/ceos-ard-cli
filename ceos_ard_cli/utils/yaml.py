@@ -2,7 +2,7 @@ from pathlib import Path
 
 import strictyaml
 
-from ..utils.files import read_file
+from ..utils.files import fix_path, read_file
 
 # Each file is parsed once per schema; callers get copies, as they may change the data
 YAML_CACHE = {}
@@ -24,12 +24,20 @@ def read_yaml(file, schema, base_path):
     frame = [path, True]
     _READING.append(frame)
     try:
-        data = to_py(strictyaml.load(read_file(file), schema(file, base_path)))
+        data = to_py(strictyaml.load(read_file(file), schema(file, base_path), label=_label(path, base_path)))
     finally:
         _READING.pop()
     if frame[1]:
         YAML_CACHE[key] = data
     return copy_data(data)
+
+
+def _label(path, base_path):
+    # Errors name the file by this label, relative to the content folder
+    try:
+        return fix_path(path.relative_to(Path(base_path).resolve()))
+    except ValueError:
+        return fix_path(path)
 
 
 def skip_if_being_read(file):

@@ -8,6 +8,7 @@ from pathlib import Path
 
 import strictyaml
 
+from .problems import WARNING, Problem, report
 from .schema import ANNEX_PATH, GLOSSARY_PATH, INTRODUCTION_PATH, REQUIREMENT_CATEGORY_PATH, REQUIREMENT_PATH
 from .utils.deprecation import describe_kind
 from .utils.files import fix_path, read_file
@@ -390,7 +391,8 @@ class GitHistory:
         path = f"pfs/{pfs}/document.yaml"
         text = self.read_files(tag, [path])[path]
         if text is None:
-            print(f"WARNING [{pfs}]: Can't determine the building blocks of release {tag}")
+            message = f"Can't determine the building blocks of release {tag}"
+            report(f"WARNING [{pfs}]: {message}", Problem(pfs=pfs, severity=WARNING, message=message))
             return None
         document = parse_yaml(text)
         members = members_from_document(document, pfs)
@@ -563,7 +565,7 @@ def _collect_nested(data, input_dir, add):
             _collect_nested(value, input_dir, add)
 
 
-def collect_former_members(releases, members_by_version, current_members, input_dir, history):
+def collect_former_members(releases, members_by_version, current_members, input_dir, history, pfs=None):
     """Collect the changes of building blocks that were part of a release, but are not part of the PFS anymore."""
     input_dir = Path(input_dir).resolve()
     # the newest release that contained the building block, to read deleted files from
@@ -582,7 +584,10 @@ def collect_former_members(releases, members_by_version, current_members, input_
         try:
             content = parse_yaml(text)
         except Exception as e:
-            print(f"WARNING: Can't read the changes of the former building block {filepath}: {e}")
+            message = f"Can't read the changes of the former building block {filepath}: {e}"
+            # A deleted file is read from the release, so it can't be fixed in the content folder
+            source = {"file": filepath} if file.is_file() else {"pfs": pfs}
+            report(f"WARNING: {message}", Problem(**source, severity=WARNING, message=message))
             continue
         kind, name = describe_kind(content)
         entries.extend(make_entries(content.get("changes"), make_block(kind.capitalize(), name, filepath), history))
@@ -645,7 +650,7 @@ def build_changelog(data, releases, history, input_dir=".", pfs=None, patch_chan
 
     entries = collect_changes(data, input_dir, history, pfs)
     current_members = {e["block"]["filepath"] for e in entries}
-    entries += collect_former_members(released, members_by_version, current_members, input_dir, history)
+    entries += collect_former_members(released, members_by_version, current_members, input_dir, history, pfs)
 
     buckets = [_make_bucket(r["version"], r["tuple"], r["date"], r["tag"], r["url"]) for r in released]
     # changes that are not part of any release, also if the current version has been released already
@@ -695,10 +700,15 @@ def build_changelog(data, releases, history, input_dir=".", pfs=None, patch_chan
         unreleased["proposed_version"] = format_version(proposed)
         unreleased["proposed_level"] = unreleased["level"]
         if proposed != current:
-            print(
-                f"WARNING [{pfs}]: The PFS document declares version {current_label}, "
+            message = (
+                f"The PFS document declares version {current_label}, "
                 f"but the changes since version {latest['version']} suggest version "
                 f"{unreleased['proposed_version']} ({unreleased['level']})"
+            )
+            file = f"pfs/{pfs}/document.yaml" if pfs else None
+            report(
+                f"WARNING [{pfs}]: {message}",
+                Problem(file=file, pfs=None if file else pfs, severity=WARNING, message=message),
             )
 
     result["versions"] = buckets

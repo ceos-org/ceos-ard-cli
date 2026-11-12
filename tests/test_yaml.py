@@ -40,7 +40,7 @@ def test_files_are_parsed_once(tmp_path, monkeypatch):
     requirement(tmp_path, "b")
     parsed = []
     load = strictyaml.load
-    monkeypatch.setattr(yaml.strictyaml, "load", lambda *args: parsed.append(1) or load(*args))
+    monkeypatch.setattr(yaml.strictyaml, "load", lambda *args, **kwargs: parsed.append(1) or load(*args, **kwargs))
 
     read(tmp_path, "a")
     read(tmp_path, "a")
