@@ -87,8 +87,8 @@ By default, HTML, PDF, and Word documents are generated.
 Pass `--pdf` to skip the PDF output and/or `--docx` to skip the Word output; the HTML version is always generated.
 A `::: {#toc}` div in the template is replaced by a table of contents of the headings that follow it.
 
-Before generating, the CLI checks that pandoc and pandoc-crossref are available and warns about versions it isn't tested with.
-Set the environment variable `CEOS_ARD_SKIP_TOOL_CHECK=1` to skip the check, e.g. on a server with a fixed environment.
+Before generating, the CLI checks that pandoc, pandoc-crossref and, for PDFs, the browser are available and warns about pandoc versions it isn't tested with.
+Set the environment variable `CEOS_ARD_SKIP_TOOL_CHECK=1` to skip the checks, e.g. on a server with a fixed environment.
 
 Links in the content and in the bibliography (e.g. from `url` fields) must use one of the schemes
 `http`, `https`, `mailto`, `ftp`, `ftps`, `sftp` and `s3`, point to an anchor (e.g. `#sec:x`),

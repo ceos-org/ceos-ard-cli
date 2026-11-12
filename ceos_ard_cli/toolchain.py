@@ -11,6 +11,7 @@ PACKAGE_NAME = "ceos-ard-cli"
 TOOLS = ["pandoc", "pandoc-crossref"]
 # Set to skip the checks where the environment is known to be right, e.g. on a server
 SKIP_CHECK = "CEOS_ARD_SKIP_TOOL_CHECK"
+BROWSER_MISSING = "The browser for the PDF is not installed: run `pixi run install-browser`"
 
 
 @cache
@@ -53,3 +54,16 @@ def check_tools() -> None:
         installed = installed_version(tool)
         if installed and installed != pinned:
             print(f"WARNING: {tool} {installed} is used, but the CLI is tested with {tool} {pinned}")
+
+
+@cache
+def check_browser() -> None:
+    """Fails without the browser that prints the PDF, before the other documents are generated."""
+    if os.environ.get(SKIP_CHECK):
+        return
+    # Only loaded for PDFs, as it takes a while
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        if not Path(p.chromium.executable_path).is_file():
+            raise ValueError(BROWSER_MISSING)
