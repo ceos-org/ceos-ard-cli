@@ -1,5 +1,6 @@
 import base64
 import os
+import re
 import subprocess
 import tempfile
 from functools import cache
@@ -8,6 +9,7 @@ from urllib.parse import quote, unquote, urlsplit
 
 from .changelog import DEFAULT_GITHUB_REPO
 from .compile import compile, remove_outputs
+from .problems import WARNING, MultipleErrors, Problem, report, to_problems
 from .toolchain import BROWSER_MISSING, check_browser, check_tools
 from .utils.files import read_file
 from .utils.pfs import list_pfs
@@ -89,7 +91,7 @@ def generate_all(
                 offline=offline,
             )
         except Exception as e:
-            print(f"Error generating {pfs}: {e}")
+            report(f"Error generating {pfs}: {e}", *to_problems(e, input_dir, pfs=pfs))
             errors += 1
 
     return errors
@@ -126,6 +128,8 @@ def generate(
         "offline": offline,
     }
 
+    # Problems of a combined document can't be assigned to one PFS
+    label = pfs[0] if len(pfs) == 1 else None
     target = None
     try:
         if not no_docx:
@@ -133,13 +137,13 @@ def generate(
             target = compile(pfs, output, input_dir, editable=True, **options)
 
             print("- Generating Word")
-            run_pandoc(target, "docx", input_dir, self_contained)
+            run_pandoc(target, "docx", input_dir, self_contained, pfs=label)
 
         print("- Generating read-only Markdown")
         target = compile(pfs, output, input_dir, editable=False, **options)
 
         print("- Generating HTML")
-        run_pandoc(target, "html", input_dir, self_contained)
+        run_pandoc(target, "html", input_dir, self_contained, pfs=label)
 
         if not no_pdf:
             print("- Generating PDF")
@@ -193,7 +197,7 @@ def run_playwright(out: Path, input_dir: Path):
         browser.close()
 
 
-def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = True):
+def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = True, pfs: str | None = None):
     cmd = [
         "pandoc",
         f"{out}.md",  # input file
@@ -248,6 +252,8 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
     if result.returncode != 0:
         errors = pandoc_errors(result.stderr)
         details = f" {errors[0]}" if len(errors) == 1 else "".join(f"\n- {error}" for error in errors)
-        raise ValueError(f"Generating the {format} file failed:{details}")
+        raise MultipleErrors(f"Generating the {format} file failed:{details}", errors)
     if result.stderr.strip():
-        print(result.stderr.rstrip())
+        # One per message of pandoc, e.g. [WARNING] ...
+        messages = re.split(r"\n(?=\[[A-Z]+\])", result.stderr.strip())
+        report(result.stderr.rstrip(), *(Problem(pfs=pfs, severity=WARNING, message=m.strip()) for m in messages))

@@ -1,10 +1,12 @@
 import re
+from pathlib import Path
 
 import bibtexparser
 import strictyaml
 
-from ..utils.files import content_file, read_file
+from ..utils.files import content_file, fix_path, read_file
 from ..utils.yaml import read_yaml, skip_if_being_read
+from .errors import ReferencedFileError, fail
 
 # The styles print the DOI after https://doi.org/, so the field must not contain the URL
 DOI = re.compile(r"10\.\d{4,9}/\S+")
@@ -21,6 +23,9 @@ def bibtex_field_problems(entry) -> list[str]:
 
 
 class IdReference(strictyaml.ScalarValidator):
+    # strictyaml's default is the class name
+    rule_description = "an id"
+
     def __init__(self, path_template, base_path, schema=None, resolve=True):
         self._path_template = path_template
         self._base_path = base_path
@@ -29,12 +34,14 @@ class IdReference(strictyaml.ScalarValidator):
 
     def validate_scalar(self, chunk):
         content = None
+        id = chunk.contents
         try:
-            file = content_file(self._base_path, self._path_template.format(id=chunk.contents))
+            file = content_file(self._base_path, self._path_template.format(id=id))
         except ValueError:
-            chunk.expecting_but_found(f"expecting an id inside of the content folder, found '{chunk.contents}'")
+            fail(chunk, f"'{id}' points outside of the content folder")
+        path = fix_path(file.relative_to(Path(self._base_path).resolve()))
         if not file.exists():
-            chunk.expecting_but_found(f"expecting an existing file at {file} for id '{chunk.contents}'")
+            fail(chunk, f"'{id}' doesn't exist, there's no file {path}")
         elif file.suffix == ".yaml":
             # A dependency on a file that is being read (e.g. requirements that depend on each other)
             # is validated by that read already
@@ -47,13 +54,14 @@ class IdReference(strictyaml.ScalarValidator):
             library = bibtexparser.parse_string(content)
             count = len(library.entries)
             if len(library.failed_blocks) > 0:
-                chunk.expecting_but_found(f"expecting a valid bibtex entry at {file}")
+                raise ReferencedFileError(chunk, path, "isn't valid bibtex")
             elif len(library.entries) != 1:
-                chunk.expecting_but_found(f"expecting a single bibtex entry per file in {file}, found {count}")
-            elif library.entries[0].key != file.stem:
-                chunk.expecting_but_found(f"expecting bibtex identifier to match file name in {file}")
+                raise ReferencedFileError(chunk, path, f"must contain a single bibtex entry, found {count}")
+            elif (key := library.entries[0].key) != file.stem:
+                message = f"the bibtex key must be '{file.stem}' as the file name, found '{key}'"
+                raise ReferencedFileError(chunk, path, message)
             elif problems := bibtex_field_problems(library.entries[0]):
-                chunk.expecting_but_found(f"expecting valid bibtex fields in {file}: {'; '.join(problems)}")
+                raise ReferencedFileError(chunk, path, f"invalid bibtex fields: {'; '.join(problems)}")
         else:
             content = read_file(file)
 

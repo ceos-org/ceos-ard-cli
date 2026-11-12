@@ -7,8 +7,9 @@ from dirsync import sync
 
 from .changelog import DEFAULT_GITHUB_REPO, compile_changelog
 from .links import resolve_links, resolve_titles
+from .problems import MultipleErrors, deprecation, report
 from .schema import REFERENCE_PATH, get_empty_requirement_part
-from .utils.deprecation import find_deprecated
+from .utils.deprecation import describe, find_deprecated_blocks
 from .utils.files import check_no_symlinks, content_file, read_file, write_file
 from .utils.pfs import read_pfs
 from .utils.template import read_document_sections, read_template
@@ -329,8 +330,8 @@ def read_data(pfs: list[str], input_dir: Path, stable: bool = False, metadata: d
         # move the glossary and references to the top level
         multi_pfs[p] = bubble_up(resolve_refs(read_pfs(p, input_dir)))
         if warn:
-            for descriptor in find_deprecated(multi_pfs[p]):
-                print(f"WARNING [{p}]: {descriptor} is deprecated")
+            for block in find_deprecated_blocks(multi_pfs[p]):
+                report(f"WARNING [{p}]: {describe(block)} is deprecated", deprecation(block, input_dir, p))
 
     if len(pfs) > 1:
         data = combine_pfs(multi_pfs)
@@ -501,7 +502,7 @@ def render_markdown(
     # and replace the @alias references in the texts with @sec: anchors
     errors += resolve_links(context, input_dir)
     if errors:
-        raise ValueError("\n".join(errors))
+        raise MultipleErrors("\n".join(errors), errors)
 
     # combined documents never have a document history
     if history and not context.get("combined"):

@@ -42,7 +42,7 @@ class TestPaths:
     @pytest.mark.parametrize("id", ["../../outside", "a/../../../outside"])
     def test_ids_must_stay_inside(self, tmp_path, id):
         write(tmp_path.parent / "outside.bib", "@misc{outside, title={Secret}}")
-        with pytest.raises(strictyaml.YAMLValidationError, match="inside of the content folder"):
+        with pytest.raises(strictyaml.YAMLValidationError, match="outside of the content folder"):
             strictyaml.load(f"- {id}", strictyaml.Seq(IdReference(REFERENCE_PATH, tmp_path)))
 
     def test_title_references_must_stay_inside(self, tmp_path):
