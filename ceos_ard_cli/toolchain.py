@@ -62,8 +62,13 @@ def check_browser() -> None:
     if os.environ.get(SKIP_CHECK):
         return
     # Only loaded for PDFs, as it takes a while
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import Error, sync_playwright
 
     with sync_playwright() as p:
-        if not Path(p.chromium.executable_path).is_file():
-            raise ValueError(BROWSER_MISSING)
+        # Launched as for the PDF, as Playwright picks one of several browser builds
+        try:
+            p.chromium.launch().close()
+        except Error as e:
+            if "Executable doesn't exist" in str(e):
+                raise ValueError(BROWSER_MISSING) from e
+            raise
