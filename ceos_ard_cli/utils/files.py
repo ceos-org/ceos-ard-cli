@@ -1,6 +1,4 @@
-import filecmp
 import os
-import shutil
 import stat
 from pathlib import Path
 
@@ -91,76 +89,3 @@ def get_all_files(folder, ext=".yaml", deep=True):
             files += get_all_files(f, ext)
 
     return files
-
-
-# Marks an assets folder in the output as a copy made by the CLI, which may be purged
-ASSETS_MARKER = ".ceos-ard-cli"
-
-
-def _links(folder):
-    for root, dirs, files in os.walk(folder):
-        for name in dirs + files:
-            path = Path(root, name)
-            if os.path.islink(path) or _is_junction(path):
-                yield path
-
-
-def _entries(folder):
-    def fail(error):
-        raise error
-
-    # Unlike Path.rglob, it reports folders that can't be read
-    for root, dirs, files in os.walk(folder, onerror=fail):
-        for name in dirs + files:
-            yield Path(root, name).relative_to(folder)
-
-
-def sync_assets(source, target):
-    """Make `target` a copy of `source`: copy new and changed files, remove all others."""
-    source, target = Path(source), Path(target)
-    marker = target / ASSETS_MARKER
-    # It remembers results by size and modification time, which a changed file can keep
-    filecmp.clear_cache()
-    # The copy would be removed with the files it is made from, or copied into itself
-    resolved = source.resolve(), target.resolve()
-    if resolved[0].is_relative_to(resolved[1]) or resolved[1].is_relative_to(resolved[0]):
-        raise ValueError(
-            f"The copy of the assets in '{fix_path(target)}' overlaps with '{fix_path(source)}': "
-            "choose another output folder"
-        )
-    if os.path.lexists(target):
-        # Copying would follow links to files outside of the folder
-        if os.path.islink(target) or _is_junction(target) or any(_links(target)):
-            raise ValueError(f"Symbolic links are not supported in '{fix_path(target)}'")
-        if not target.is_dir() or (not marker.is_file() and any(target.iterdir())):
-            raise ValueError(
-                f"'{fix_path(target)}' was not created by the CLI and its files would be removed: "
-                "choose another output folder or remove it"
-            )
-    wanted = set(_entries(source)) if source.is_dir() else set()
-    if any(path.as_posix().lower() == ASSETS_MARKER for path in wanted):
-        raise ValueError(f"'{ASSETS_MARKER}' is reserved and can't be used in '{fix_path(source)}'")
-    target.mkdir(parents=True, exist_ok=True)
-    marker.touch()
-    # Compared as text, as paths are equal on Windows if only their case differs
-    names = {path.as_posix() for path in wanted}
-    # Files before their folders, and before copying as a renamed file can be the same file (a.png -> A.png)
-    for path in sorted(target.rglob("*"), reverse=True):
-        if path.relative_to(target).as_posix() not in names and path != marker:
-            if path.is_dir():
-                path.rmdir()
-            else:
-                path.unlink()
-    # Folders before their files
-    for path in sorted(wanted):
-        src, dst = source / path, target / path
-        if src.is_dir():
-            if dst.is_file():
-                dst.unlink()
-            dst.mkdir(exist_ok=True)
-        elif not (dst.is_file() and filecmp.cmp(src, dst, shallow=False)):
-            if dst.is_dir():
-                shutil.rmtree(dst)
-            # Not overwritten, as a hard link would change the file it shares its content with
-            dst.unlink(missing_ok=True)
-            shutil.copy2(src, dst)
