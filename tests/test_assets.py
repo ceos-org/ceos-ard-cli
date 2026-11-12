@@ -126,6 +126,33 @@ class TestAssets:
             sync_assets(source, target)
         assert tree(target) == ["sub", "sub/a.png"]
 
+    @pytest.mark.parametrize(
+        ("source", "target"),
+        [("out/assets/content/assets", "out/assets"), ("assets", "assets/out/assets"), ("assets", "assets")],
+    )
+    def test_overlapping_folders_are_refused(self, tmp_path, source, target):
+        source, target = tmp_path / source, tmp_path / target
+        write(target / ASSETS_MARKER, "")
+        write(source / "a.png", "a")
+        with pytest.raises(ValueError, match="overlaps"):
+            sync_assets(source, target)
+        assert (source / "a.png").read_text() == "a"
+
+    def test_hard_links_in_the_copy_are_replaced(self, tmp_path):
+        source, target = tmp_path / "assets", tmp_path / "out" / "assets"
+        write(source / "a.png", "old")
+        sync_assets(source, target)
+        write(tmp_path / "outside.txt", "theirs")
+        (target / "a.png").unlink()
+        try:
+            os.link(tmp_path / "outside.txt", target / "a.png")
+        except OSError:
+            pytest.skip("can't create hard links")
+        write(source / "a.png", "new")
+        sync_assets(source, target)
+        assert (target / "a.png").read_text() == "new"
+        assert (tmp_path / "outside.txt").read_text() == "theirs"
+
     def test_without_assets(self, tmp_path):
         target = tmp_path / "out" / "assets"
         sync_assets(tmp_path / "assets", target)

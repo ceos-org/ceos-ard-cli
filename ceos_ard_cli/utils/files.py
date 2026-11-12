@@ -121,6 +121,13 @@ def sync_assets(source, target):
     marker = target / ASSETS_MARKER
     # It remembers results by size and modification time, which a changed file can keep
     filecmp.clear_cache()
+    # The copy would be removed with the files it is made from, or copied into itself
+    resolved = source.resolve(), target.resolve()
+    if resolved[0].is_relative_to(resolved[1]) or resolved[1].is_relative_to(resolved[0]):
+        raise ValueError(
+            f"The copy of the assets in '{fix_path(target)}' overlaps with '{fix_path(source)}': "
+            "choose another output folder"
+        )
     if os.path.lexists(target):
         # Copying would follow links to files outside of the folder
         if os.path.islink(target) or _is_junction(target) or any(_links(target)):
@@ -154,4 +161,6 @@ def sync_assets(source, target):
         elif not (dst.is_file() and filecmp.cmp(src, dst, shallow=False)):
             if dst.is_dir():
                 shutil.rmtree(dst)
+            # Not overwritten, as a hard link would change the file it shares its content with
+            dst.unlink(missing_ok=True)
             shutil.copy2(src, dst)
