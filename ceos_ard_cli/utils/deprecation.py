@@ -1,9 +1,8 @@
-def find_deprecated(data):
+def find_deprecated_blocks(data):
     """
     Recursively collect the deprecated building blocks that are used in a PFS document.
 
     Works on both unresolved (read_pfs) and resolved (resolve_refs/bubble_up) documents.
-    Returns a list of human-readable descriptors, one per building block.
     """
     found = {}
     _find_deprecated(data, found)
@@ -16,7 +15,7 @@ def _find_deprecated(data, found):
             # deduplicate building blocks that are used multiple times
             key = data.get("filepath", id(data))
             if key not in found:
-                found[key] = describe(data)
+                found[key] = data
         for v in data.values():
             _find_deprecated(v, found)
     elif isinstance(data, list):

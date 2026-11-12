@@ -16,6 +16,7 @@ Validates the [CEOS-ARD building blocks](https://github.com/ceos-org/ceos-ard) a
   - [`compile`](#compile)
   - [`validate`](#validate)
   - [`check-changes`](#check-changes)
+  - [Problems as JSON](#problems-as-json)
 - [Document history](#document-history)
 - [Content rules](#content-rules)
 - [Templates](#templates)
@@ -96,6 +97,7 @@ Creates `SR.html`, `SR.docx` and `SR.pdf` for the PFS in `pfs/SR`, together with
 | `-r`, `--stable` | Removes the `-draft` suffix from the version and adds the version to the file name, e.g. `SR-v1.0.0.html` |
 | `--id`, `--title`, `--version`, `--pfs-type` | Override the metadata of the document |
 | `--history`, `--patch-changes`, `--github-repo`, `--offline` | See [Document history](#document-history) |
+| `-f json`, `--format json` | Prints the [problems as JSON](#problems-as-json) |
 
 The HTML document is always created.
 
@@ -121,7 +123,7 @@ Runs `generate` for every PFS in the `pfs` folder.
 | --- | --- |
 | `-o`, `--output` | Output folder, defaults to the current folder |
 | `-p`, `--pfs` | Only generates the given PFS, can be repeated |
-| `--pdf`, `--docx`, `-s`, `-r`, `--history`, `--patch-changes`, `--github-repo`, `--offline` | As for `generate` |
+| `--pdf`, `--docx`, `-s`, `-r`, `--history`, `--patch-changes`, `--github-repo`, `--offline`, `-f` | As for `generate` |
 
 ### `compile`
 
@@ -141,6 +143,7 @@ It fails if an `assets` folder with files exists there that the CLI didn't creat
 | `-r`, `--stable` | As for `generate` |
 | `--debug` | Writes the data of the template as `SR.debug.json` and shows stack traces |
 | `--history`, `--patch-changes`, `--github-repo`, `--offline` | See [Document history](#document-history) |
+| `-f json`, `--format json` | Prints the [problems as JSON](#problems-as-json) |
 
 ### `validate`
 
@@ -153,6 +156,9 @@ It also lists the building blocks that no PFS uses.
 
 If pandoc is available, the content is checked as well (see [Content rules](#content-rules)), as `generate` does.
 
+Fails if there's at least one error. Unused building blocks and deprecated ones are warnings.
+Pass `-f json` to print the [problems as JSON](#problems-as-json).
+
 ### `check-changes`
 
 ```bash
@@ -163,6 +169,25 @@ Fails if a building block was changed without a new entry in its `changes`. Made
 
 - The working tree is compared against the merge base of the given git ref and `HEAD`.
 - Files that only differ in `changes` or `history` need no new entry.
+
+### Problems as JSON
+
+With `-f json`, `generate`, `generate-all`, `compile` and `validate` print the problems they find as a JSON array, e.g. for a server or an editor.
+The JSON is the only output on stdout, the progress goes to stderr.
+
+```json
+[
+  {"file": "requirements/a.yaml", "line": 4, "column": 3, "severity": "error", "message": "unknown key 'descripton'"},
+  {"pfs": "SR", "severity": "warning", "message": "[WARNING] ..."}
+]
+```
+
+- `file` is relative to the input folder. Problems that belong to a PFS but not to a file (e.g. pandoc warnings) have `pfs` instead.
+  Problems that belong to neither, e.g. of a combined document, have none of the two.
+- `line` and `column` start at 1 and are only given where known.
+- `severity` is `error` or `warning`.
+
+The exit code is 1 if there's at least one error, otherwise 0.
 
 ## Document history
 
@@ -176,7 +201,8 @@ ceos-ard generate ST --history --stable
 
 - The input folder is a git checkout with the full history and the release tags, e.g. `fetch-depth: 0` for `actions/checkout`, or `git fetch --tags` locally.
 - The releases are read from GitHub (`ceos-org/ceos-ard`, or the repository given with `--github-repo`). Set the `GITHUB_TOKEN` environment variable to avoid rate limits.
-- With `--offline`, the releases are read from the git tags instead, which needs no network access. The dates are then the ones of the tags, and pre-releases are listed, too.
+- With `--offline`, the releases are read from the git tags instead, without network access.
+  The release dates are the dates of the tags, and pre-releases are listed, too.
 
 **What is listed**
 
