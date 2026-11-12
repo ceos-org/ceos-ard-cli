@@ -1,3 +1,5 @@
+import bisect
+import copy
 import re
 from collections import defaultdict
 from pathlib import Path
@@ -89,8 +91,6 @@ def topological_sort_requirements(
         for successor in successors:
             in_degree[successor] -= 1
             if in_degree[successor] == 0:
-                import bisect
-
                 bisect.insort(queue, successor)
 
     # Check for cycles
@@ -352,6 +352,54 @@ def read_data(pfs: list[str], input_dir: Path, stable: bool = False, metadata: d
     return data
 
 
+def prepare(
+    pfs: list[str], out: Path | str, input_dir: Path | str, stable: bool = False, metadata: dict = {}
+) -> tuple[dict, Path]:
+    """The part of a compilation that the editable and the read-only document share:
+    checks the input folder, copies the assets and reads the data. Returns the data and the name of the document."""
+    check_no_symlinks(input_dir)
+    out = Path(out).resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # The documents link to the assets relative to the output folder
+    input_dir = Path(input_dir).resolve()
+    assets_source = input_dir / "assets"
+    assets_target = out.parent / "assets"
+    if assets_source != assets_target:
+        sync_assets(assets_source, assets_target)
+
+    try:
+        data = read_data(pfs, input_dir, stable, metadata)
+    except Exception:
+        # Without the data, the name of a stable document isn't known, and the draft's files must stay
+        if not stable:
+            remove_outputs(out)
+        raise
+    if stable:
+        out = out.with_name(f"{out.name}-v{data['version']}")
+    return data, out
+
+
+def compile_files(
+    data: dict, out: Path, pfs: list[str], input_dir: Path | str, editable: bool = False, debug: bool = False, **history
+):
+    """Writes the Markdown and the bibliography of a prepared document."""
+    try:
+        # write a json file for debugging
+        if debug:
+            import json
+
+            write_file(f"{out}.debug.json", json.dumps(data, indent=2))
+
+        # Rendering changes the data, which the other variant of the document needs as it was read
+        compile_markdown(
+            copy.deepcopy(data), f"{out}.md", editable, input_dir, pfs=pfs[0] if len(pfs) == 1 else None, **history
+        )
+        compile_bibtex(data, f"{out}.bib", input_dir)
+    except Exception:
+        remove_outputs(out)
+        raise
+
+
 def compile(
     pfs: list[str] | str,
     out: Path | str,
@@ -368,49 +416,19 @@ def compile(
     if isinstance(pfs, str):
         pfs = [pfs]
 
-    check_no_symlinks(input_dir)
-    out = Path(out).resolve()
-    out.parent.mkdir(parents=True, exist_ok=True)
-    # The documents link to the assets relative to the output folder
-    input_dir = Path(input_dir).resolve()
-    assets_source = input_dir / "assets"
-    assets_target = out.parent / "assets"
-    if assets_source != assets_target:
-        sync_assets(assets_source, assets_target)
-
-    data = None
-    try:
-        data = read_data(pfs, input_dir, stable, metadata)
-
-        if stable:
-            out = out.with_name(f"{out.name}-v{data['version']}")
-
-        # write a json file for debugging
-        if debug:
-            import json
-
-            write_file(f"{out}.debug.json", json.dumps(data, indent=2))
-
-        # create the markdown file
-        compile_markdown(
-            data,
-            f"{out}.md",
-            editable,
-            input_dir,
-            history=history,
-            github_repo=github_repo,
-            patch_changes=patch_changes,
-            offline=offline,
-            pfs=pfs[0] if len(pfs) == 1 else None,
-        )
-        # write bibtex file to disk
-        compile_bibtex(data, f"{out}.bib", input_dir)
-    except Exception:
-        # Without the data, the name of a stable document isn't known, and the draft's files must stay
-        if data is not None or not stable:
-            remove_outputs(out)
-        raise
-
+    data, out = prepare(pfs, out, input_dir, stable, metadata)
+    compile_files(
+        data,
+        out,
+        pfs,
+        input_dir,
+        editable,
+        debug,
+        history=history,
+        github_repo=github_repo,
+        patch_changes=patch_changes,
+        offline=offline,
+    )
     return out
 
 
@@ -429,7 +447,6 @@ def merge_bibtex(data, input_dir: Path) -> str:
     return "\n".join(read_file(content_file(input_dir, REFERENCE_PATH.format(id=ref))) for ref in data["references"])
 
 
-# Note: This function is not used for the append/replace functionality
 def append_requirement(target, req):
     if len(target["description"]) > 0:
         target["description"] += "\n\n" + req["description"]

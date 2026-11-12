@@ -72,14 +72,14 @@ def test_pandoc_failures_report_the_reason(tmp_path, capfd):
 def test_failed_builds_leave_no_files(tmp_path, monkeypatch):
     target = tmp_path / "out" / "doc"
 
-    def compile(*args, **kwargs):
+    def compile_files(*args, **kwargs):
         write(tmp_path / "templates" / "template.html", "$if(title)$\n$body$\n")
         write(target.with_suffix(".md"), "# Title\n")
         write(target.with_suffix(".bib"), "")
-        return target
 
-    # the package exports the click command of the same name, not the module
-    monkeypatch.setattr(importlib.import_module("ceos_ard_cli.generate"), "compile", compile)
+    module = importlib.import_module("ceos_ard_cli.generate")
+    monkeypatch.setattr(module, "prepare", lambda *args, **kwargs: ({}, target))
+    monkeypatch.setattr(module, "compile_files", compile_files)
     # from an earlier run, it would look like the result of this one
     write(target.with_suffix(".pdf"), "old")
 
@@ -167,3 +167,25 @@ def test_pfs_must_be_a_folder_name(tmp_path, pfs):
     write(tmp_path / "requirements" / "document.yaml", "title: Secret\n")
     with pytest.raises(ValueError, match="Invalid PFS"):
         read_pfs(pfs, tmp_path)
+
+
+def test_generating_prepares_the_document_once(tmp_path, monkeypatch):
+    module = importlib.import_module("ceos_ard_cli.generate")
+    compilation = importlib.import_module("ceos_ard_cli.compile")
+    calls = []
+    (tmp_path / "assets").mkdir()
+
+    def count(name, result=None):
+        return lambda *args, **kwargs: calls.append(name) or result
+
+    monkeypatch.setattr(module, "check_tools", lambda: None)
+    monkeypatch.setattr(module, "run_pandoc", count("pandoc"))
+    monkeypatch.setattr(compilation, "check_no_symlinks", count("symlinks"))
+    monkeypatch.setattr(compilation, "sync_assets", count("assets"))
+    monkeypatch.setattr(compilation, "read_data", count("data", {"version": "1.0.0"}))
+    monkeypatch.setattr(compilation, "compile_markdown", count("markdown"))
+    monkeypatch.setattr(compilation, "compile_bibtex", count("bibtex"))
+
+    generate("SR", tmp_path / "out" / "SR", tmp_path, no_pdf=True)
+
+    assert calls == ["symlinks", "assets", "data", "markdown", "bibtex", "pandoc", "markdown", "bibtex", "pandoc"]
