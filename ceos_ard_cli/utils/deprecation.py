@@ -1,14 +1,9 @@
-def find_deprecated(data):
+def find_deprecated_blocks(data):
     """
     Recursively collect the deprecated building blocks that are used in a PFS document.
 
     Works on both unresolved (read_pfs) and resolved (resolve_refs/bubble_up) documents.
-    Returns a list of human-readable descriptors, one per building block.
     """
-    return [describe(block) for block in find_deprecated_blocks(data)]
-
-
-def find_deprecated_blocks(data):
     found = {}
     _find_deprecated(data, found)
     return list(found.values())

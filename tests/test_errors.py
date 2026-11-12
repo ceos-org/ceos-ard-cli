@@ -7,7 +7,7 @@ import pytest
 from ceos_ard_cli.schema import REQUIREMENT
 from ceos_ard_cli.utils import files, yaml
 from ceos_ard_cli.utils.yaml import read_yaml
-from ceos_ard_cli.validate import to_problem
+from ceos_ard_cli.problems import to_problem
 
 HEAD = "id: a\ntitle: Title\n"
 PART = "requirements:\n  threshold:\n    description: Text\n"

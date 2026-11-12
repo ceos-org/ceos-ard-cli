@@ -8,6 +8,7 @@ from pathlib import Path
 
 import strictyaml
 
+from .problems import WARNING, Problem, report
 from .schema import ANNEX_PATH, GLOSSARY_PATH, INTRODUCTION_PATH, REQUIREMENT_CATEGORY_PATH, REQUIREMENT_PATH
 from .utils.deprecation import describe_kind
 from .utils.files import fix_path, read_file
@@ -390,7 +391,8 @@ class GitHistory:
         path = f"pfs/{pfs}/document.yaml"
         text = self.read_files(tag, [path])[path]
         if text is None:
-            print(f"WARNING [{pfs}]: Can't determine the building blocks of release {tag}")
+            message = f"Can't determine the building blocks of release {tag}"
+            report(f"WARNING [{pfs}]: {message}", Problem(pfs=pfs, severity=WARNING, message=message))
             return None
         document = parse_yaml(text)
         members = members_from_document(document, pfs)
@@ -582,7 +584,8 @@ def collect_former_members(releases, members_by_version, current_members, input_
         try:
             content = parse_yaml(text)
         except Exception as e:
-            print(f"WARNING: Can't read the changes of the former building block {filepath}: {e}")
+            message = f"Can't read the changes of the former building block {filepath}: {e}"
+            report(f"WARNING: {message}", Problem(severity=WARNING, message=message))
             continue
         kind, name = describe_kind(content)
         entries.extend(make_entries(content.get("changes"), make_block(kind.capitalize(), name, filepath), history))
@@ -695,10 +698,15 @@ def build_changelog(data, releases, history, input_dir=".", pfs=None, patch_chan
         unreleased["proposed_version"] = format_version(proposed)
         unreleased["proposed_level"] = unreleased["level"]
         if proposed != current:
-            print(
-                f"WARNING [{pfs}]: The PFS document declares version {current_label}, "
+            message = (
+                f"The PFS document declares version {current_label}, "
                 f"but the changes since version {latest['version']} suggest version "
                 f"{unreleased['proposed_version']} ({unreleased['level']})"
+            )
+            file = f"pfs/{pfs}/document.yaml" if pfs else None
+            report(
+                f"WARNING [{pfs}]: {message}",
+                Problem(file=file, pfs=None if file else pfs, severity=WARNING, message=message),
             )
 
     result["versions"] = buckets

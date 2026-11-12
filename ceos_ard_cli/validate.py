@@ -3,18 +3,14 @@ import shutil
 import subprocess
 import tempfile
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
 from pathlib import Path
-
-from jinja2 import TemplateSyntaxError
-from strictyaml.ruamel.error import MarkedYAMLError
 
 from .compile import merge_bibtex, read_data, render_markdown
 from .generate import pandoc_env, pandoc_errors
 from .links import resolve_links, resolve_titles
+from .problems import WARNING, Problem, content_problem, deprecation, to_problem
 from .schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS, GLOSSARY, REQUIREMENT, SECTION
-from .strictyaml.errors import explain
-from .utils.deprecation import describe, describe_kind, find_deprecated_blocks
+from .utils.deprecation import describe, find_deprecated_blocks
 from .utils.files import FILE_CACHE, check_no_symlinks, fix_path, get_all_files, get_all_folders
 from .utils.template import FILTERS_DIR, check_template, read_document_section, used_document_sections
 from .utils.yaml import read_yaml
@@ -24,45 +20,7 @@ SANITIZE_FILTERS = ["sanitize.lua"]
 CHECK_FILTERS = ["links.lua"]
 CHECK_TIMEOUT = 60
 
-ERROR = "error"
-WARNING = "warning"
 TEMPLATE_PATH = "templates/template.md"
-
-
-@dataclass(frozen=True, kw_only=True)
-class Problem:
-    file: str | None = None
-    pfs: str | None = None
-    line: int | None = None
-    column: int | None = None
-    severity: str = ERROR
-    message: str
-
-    def to_dict(self) -> dict:
-        return {key: value for key, value in asdict(self).items() if value is not None}
-
-
-def to_problem(error, input_dir: Path, file: str | None = None, pfs: str | None = None) -> Problem:
-    if isinstance(error, MarkedYAMLError):
-        message, name, line, column = explain(error)
-        # YAML errors are raised in the file that has the problem, which can be one that the checked file references
-        if name is not None and (input_dir / name).is_file():
-            return Problem(file=name, line=line, column=column, message=message)
-        return Problem(file=file, pfs=pfs, message=message)
-    if isinstance(error, TemplateSyntaxError) and error.name and (input_dir / "templates" / error.name).is_file():
-        return Problem(file=f"templates/{error.name}", line=error.lineno, message=error.message)
-    return Problem(file=file, pfs=pfs, message=str(error))
-
-
-def unique(problems: list[Problem]) -> list[Problem]:
-    return list(dict.fromkeys(problems))
-
-
-def relative_path(path, input_dir: Path) -> str | None:
-    try:
-        return fix_path(Path(path).resolve().relative_to(input_dir))
-    except ValueError:
-        return None
 
 
 def check_content(markdown: str, input_dir: Path, bibtex: str = "") -> list[str]:
@@ -95,7 +53,7 @@ def _run_pandoc(args: list[str], markdown: str, input_dir: Path) -> list[str]:
     return [] if result.returncode == 0 else pandoc_errors(result.stderr)
 
 
-def check_rendering(data: dict, input_dir: Path) -> list[str]:
+def check_rendering(data: dict, input_dir: Path, pfs: str | None = None) -> list[tuple[str, Problem]]:
     """Render the read-only and the editable document, failing on undefined variables, missing templates and
     content that the check filters refuse."""
     errors = []
@@ -106,11 +64,12 @@ def check_rendering(data: dict, input_dir: Path) -> list[str]:
             # Rendering changes the data, and copying it is much faster than reading it again
             markdown = render_markdown(copy.deepcopy(data), editable, input_dir, strict=True)
         except Exception as e:
-            errors.append(f"template ({kind}): {e}")
+            errors.append((f"template ({kind}): {e}", Problem(pfs=pfs, message=f"template ({kind}): {e}")))
             continue
         # The editable document has all the content of the read-only one, and names the building blocks
         if editable and shutil.which("pandoc"):
-            errors += [f"content: {problem}" for problem in check_content(markdown, input_dir, bibtex)]
+            for line in check_content(markdown, input_dir, bibtex):
+                errors.append((f"content: {line}", content_problem(line, input_dir, pfs)))
     return errors
 
 
@@ -182,25 +141,23 @@ def validate(input_dir, out: Callable[[str], None] = print) -> list[Problem]:
             deprecated = find_deprecated_blocks(data)
             links = copy.deepcopy(data)
             # check that all @title: references point to existing building blocks
-            errors = resolve_titles(links, input_dir)
+            link_errors = resolve_titles(links, input_dir)
             # check that all dependencies and sections links can be resolved
-            errors += resolve_links(links, input_dir)
+            link_errors += resolve_links(links, input_dir)
+            errors = [(message, Problem(pfs=pfs, message=message)) for message in link_errors]
             if not errors:
-                errors = check_rendering(data, input_dir)
+                errors = check_rendering(data, input_dir, pfs)
         except Exception as e:
             all_read = False
             check(pfs, e, pfs=pfs)
         else:
             check(pfs)
-        for message in errors:
-            out(f"  - ERROR: {message}")
-            problems.append(Problem(pfs=pfs, message=message))
+        for text, problem in errors:
+            out(f"  - ERROR: {text}")
+            problems.append(problem)
         for block in deprecated:
             out(f"  - WARNING: {describe(block)} is deprecated")
-            kind, name = describe_kind(block)
-            file = relative_path(block["filepath"], input_dir) if block.get("filepath") else None
-            message = f"{kind} '{name}' is deprecated"
-            problems.append(Problem(file=file, pfs=None if file else pfs, severity=WARNING, message=message))
+            problems.append(deprecation(block, input_dir, pfs))
 
     out("Checking for files not referenced by any PFS")
     # A PFS that can't be read stops reading at the problem, so its other files would look unused
