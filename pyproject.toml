@@ -42,11 +42,15 @@ dev = [
 ceos-ard = "ceos_ard_cli:cli"
 
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.version]
 path = "ceos_ard_cli/version.py"
+
+# The tool versions in [tool.pixi.dependencies] are part of the package, see ceos_ard_cli/toolchain.py
+[tool.hatch.build.targets.wheel.force-include]
+"pyproject.toml" = "ceos_ard_cli/pyproject.toml"
 
 [tool.pixi.project]
 channels = ["conda-forge"]
