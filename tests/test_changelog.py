@@ -838,6 +838,22 @@ class TestGitHistory:
         assert changes_of(result, "6.0.0-draft") == ["Change B"]
         assert changes_of(result, "5.0.1") == ["Change A, fixed", "Change G"]
 
+    def test_offline_releases_come_from_the_tags(self, repo, monkeypatch):
+        def no_network(*args, **kwargs):
+            raise AssertionError("must not use the network")
+
+        monkeypatch.setattr(changelog, "_http_get", no_network)
+        git(repo, "tag", "SR-v1.0.0")
+        git(repo, "tag", "ST-v5.0.1-rc1")
+
+        releases = changelog.local_releases(GitHistory(repo), "org/repo", "ST")
+        assert [r["tag"] for r in releases] == ["ST-v5.0.1"]
+        assert releases[0]["url"] == "https://github.com/org/repo/releases/tag/ST-v5.0.1"
+        assert releases[0]["date"] == date.today()
+
+        result = compile_changelog(pfs_document(repo, "6.0.0-draft"), repo, "ST", offline=True)
+        assert [v["version"] for v in result["versions"]] == ["6.0.0-draft", "5.0.1"]
+
     def test_shallow_clone(self, repo, tmp_path_factory):
         clone = tmp_path_factory.mktemp("clone")
         git(clone, "clone", "-q", "--depth", "1", repo.as_uri(), ".")
