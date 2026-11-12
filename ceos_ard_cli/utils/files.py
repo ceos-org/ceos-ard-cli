@@ -24,14 +24,19 @@ def content_file(base, relative):
     return file
 
 
+# Folders in the input folder that are not checked for links, besides the ones that start with a dot (e.g. .venv):
+# environments are full of links. Only skipped at the top level, where the CLI reads no files from them.
+SKIPPED_FOLDERS = ["node_modules"]
+
+
 def check_no_symlinks(input_dir):
     # They could lead the documents to files outside of the input folder: images and other
     # relative paths can point anywhere inside of it, so the whole folder is checked
     input_dir = Path(input_dir)
     found = []
     for root, dirs, files in os.walk(input_dir):
-        if Path(root) == input_dir and ".git" in dirs:
-            dirs.remove(".git")
+        if Path(root) == input_dir:
+            dirs[:] = [name for name in dirs if not name.startswith(".") and name not in SKIPPED_FOLDERS]
         for name in dirs + files:
             path = Path(root, name)
             if os.path.islink(path) or _is_junction(path):

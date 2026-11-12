@@ -87,6 +87,9 @@ By default, HTML, PDF, and Word documents are generated.
 Pass `--pdf` to skip the PDF output and/or `--docx` to skip the Word output; the HTML version is always generated.
 A `::: {#toc}` div in the template is replaced by a table of contents of the headings that follow it.
 
+Before generating, the CLI checks that pandoc, pandoc-crossref and, for PDFs, the browser are available and warns about pandoc versions it isn't tested with.
+Set the environment variable `CEOS_ARD_SKIP_TOOL_CHECK=1` to skip the checks, e.g. on a server with a fixed environment.
+
 Links in the content and in the bibliography (e.g. from `url` fields) must use one of the schemes
 `http`, `https`, `mailto`, `ftp`, `ftps`, `sftp` and `s3`, point to an anchor (e.g. `#sec:x`),
 or point to an existing file in the `assets` folder, which is the only folder that is published with the documents.
@@ -103,6 +106,7 @@ To limit what the content can do while the documents are generated:
   and `label`, `columns` and `widths`, which the template uses, are allowed.
 - Only the metadata of the front matter of `template.md` is allowed, so the content can't add any, e.g. `css`.
 - IDs and `@title:` references must point to files inside the input directory, and symbolic links are refused.
+  Only top-level folders that start with a dot (e.g. `.venv`) and `node_modules` may contain links.
 - Chromium renders the PDF without JavaScript and only loads files from the output directory.
 
 The HTML, Word and PDF templates that replace the built-in ones from the input directory are trusted and not checked.
