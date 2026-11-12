@@ -68,6 +68,7 @@ class TestCLI:
         ("command", "message"),
         [
             (["compile", "../requirements"], "Invalid PFS '../requirements'"),
+            (["generate", "C:"], "Invalid PFS 'C:'"),
             (["generate", "TYPO"], "Unknown PFS 'TYPO', expected one of: SR"),
             (["generate-all", "--pfs", "TYPO"], "Unknown PFS 'TYPO', expected one of: SR"),
         ],
