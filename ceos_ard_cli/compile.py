@@ -366,6 +366,7 @@ def compile(
     history: bool = False,
     github_repo: str = DEFAULT_GITHUB_REPO,
     patch_changes: bool = False,
+    offline: bool = False,
 ):
     if isinstance(pfs, str):
         pfs = [pfs]
@@ -411,6 +412,7 @@ def compile(
             history=history,
             github_repo=github_repo,
             patch_changes=patch_changes,
+            offline=offline,
             pfs=pfs[0] if len(pfs) == 1 else None,
         )
         # write bibtex file to disk
@@ -462,6 +464,7 @@ def render_markdown(
     patch_changes: bool = False,
     pfs: str = None,
     strict: bool = False,
+    offline: bool = False,
 ) -> str:
     input_dir = Path(input_dir).resolve()
     # create a copy of the data for the template
@@ -502,7 +505,9 @@ def render_markdown(
 
     # combined documents never have a document history
     if history and not context.get("combined"):
-        context["changelog"] = compile_changelog(context, input_dir, pfs or context["id"], github_repo, patch_changes)
+        context["changelog"] = compile_changelog(
+            context, input_dir, pfs or context["id"], github_repo, patch_changes, offline
+        )
     else:
         context["changelog"] = None
 

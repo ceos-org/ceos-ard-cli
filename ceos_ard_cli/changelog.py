@@ -128,6 +128,26 @@ def fetch_releases(repo, pfs, token=None):
     return releases
 
 
+def local_releases(history, repo, pfs):
+    """
+    Get the releases of the PFS from the git tags, sorted from the oldest to the newest version.
+
+    Needs no network access, but the dates are the ones of the tags and pre-releases can't be told apart.
+    """
+    releases = [
+        {
+            "version": version,
+            "tuple": parse_version(version),
+            "date": day,
+            "tag": f"{pfs}-v{version}",
+            "url": f"https://github.com/{repo}/releases/tag/{pfs}-v{version}",
+        }
+        for version, day in history.tagged_versions(pfs)
+    ]
+    releases.sort(key=lambda r: r["tuple"])
+    return releases
+
+
 def parse_yaml(text):
     """Parse YAML without a schema (all scalars are strings)."""
     data = strictyaml.dirty_load(text, allow_flow_style=True).data
@@ -384,6 +404,13 @@ class GitHistory:
 
     def read_file(self, tag, path):
         return self.read_files(tag, [path])[path]
+
+    def tagged_versions(self, pfs):
+        """Get the versions of the release tags of the PFS with the dates of the tags."""
+        pattern = re.compile(rf"^{re.escape(pfs)}-v(\d+\.\d+\.\d+)\t(\S+)$")
+        output = self._git("tag", "--list", "--format=%(refname:short)%09%(creatordate:short)", f"{pfs}-v*")
+        matches = map(pattern.match, output.splitlines())
+        return [(match.group(1), date.fromisoformat(match.group(2))) for match in matches if match]
 
     def head_versions(self, pfs):
         pattern = re.compile(rf"^{re.escape(pfs)}-v(\d+\.\d+\.\d+)$")
@@ -694,7 +721,7 @@ def _make_bucket(version, version_tuple, released_date=None, tag=None, url=None)
     }
 
 
-def compile_changelog(data, input_dir, pfs, repo=DEFAULT_GITHUB_REPO, patch_changes=False):
+def compile_changelog(data, input_dir, pfs, repo=DEFAULT_GITHUB_REPO, patch_changes=False, offline=False):
     history = GitHistory.load(input_dir)
     current = parse_version(data["version"])
     for version in history.head_versions(pfs):
@@ -702,5 +729,5 @@ def compile_changelog(data, input_dir, pfs, repo=DEFAULT_GITHUB_REPO, patch_chan
             raise ValueError(
                 f"The release tag {pfs}-v{version} doesn't match the version {data['version']} of the PFS document"
             )
-    releases = fetch_releases(repo, pfs)
+    releases = local_releases(history, repo, pfs) if offline else fetch_releases(repo, pfs)
     return build_changelog(data, releases, history, input_dir, pfs, patch_changes)

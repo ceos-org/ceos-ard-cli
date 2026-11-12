@@ -67,6 +67,7 @@ def generate_all(
     history: bool = False,
     github_repo: str = DEFAULT_GITHUB_REPO,
     patch_changes: bool = False,
+    offline: bool = False,
 ):
     input_dir = Path(input_dir).resolve()
     output = Path(output)
@@ -85,6 +86,7 @@ def generate_all(
                 history=history,
                 github_repo=github_repo,
                 patch_changes=patch_changes,
+                offline=offline,
             )
         except Exception as e:
             print(f"Error generating {pfs}: {e}")
@@ -105,6 +107,7 @@ def generate(
     history: bool = False,
     github_repo: str = DEFAULT_GITHUB_REPO,
     patch_changes: bool = False,
+    offline: bool = False,
 ):
     if isinstance(pfs, str):
         pfs = [pfs]
@@ -120,6 +123,7 @@ def generate(
         "history": history,
         "github_repo": github_repo,
         "patch_changes": patch_changes,
+        "offline": offline,
     }
 
     target = None
