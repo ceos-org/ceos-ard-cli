@@ -22,7 +22,7 @@ dependencies = [
     "jinja2>=3.1.0,<4",
     "click>=8.0.0,<9",
     "playwright>=1.50.0,<2",
-    "bibtexparser==2.0.0b9",
+    "bibtexparser>=2.1.0,<3",
 ]
 
 [project.urls]
