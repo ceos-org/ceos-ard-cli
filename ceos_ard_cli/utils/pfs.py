@@ -11,6 +11,11 @@ def check_pfs_name(pfs):
         raise ValueError(f"Invalid PFS '{pfs}', expected the name of a folder in 'pfs'")
 
 
+def list_pfs(input_dir):
+    folder = Path(input_dir) / "pfs"
+    return sorted(p.name for p in folder.iterdir() if p.is_dir() and not p.name.startswith("."))
+
+
 def check_input(input_dir, pfs=()):
     """Checks the input folder and the names of the given PFS, before anything is written."""
     folder = Path(input_dir) / "pfs"
@@ -22,8 +27,7 @@ def check_input(input_dir, pfs=()):
     for name in pfs:
         check_pfs_name(name)
         if not (folder / name).is_dir():
-            known = ", ".join(sorted(p.name for p in folder.iterdir() if p.is_dir()))
-            raise ValueError(f"Unknown PFS '{name}', expected one of: {known}")
+            raise ValueError(f"Unknown PFS '{name}', expected one of: {', '.join(list_pfs(input_dir))}")
 
 
 def read_pfs(pfs, input_dir: Path):
