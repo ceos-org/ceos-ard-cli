@@ -105,6 +105,16 @@ def _links(folder):
                 yield path
 
 
+def _entries(folder):
+    def fail(error):
+        raise error
+
+    # Unlike Path.rglob, it reports folders that can't be read
+    for root, dirs, files in os.walk(folder, onerror=fail):
+        for name in dirs + files:
+            yield Path(root, name).relative_to(folder)
+
+
 def sync_assets(source, target):
     """Make `target` a copy of `source`: copy new and changed files, remove all others."""
     source, target = Path(source), Path(target)
@@ -120,9 +130,20 @@ def sync_assets(source, target):
                 f"'{fix_path(target)}' was not created by the CLI and its files would be removed: "
                 "choose another output folder or remove it"
             )
-    wanted = {path.relative_to(source) for path in source.rglob("*")} if source.is_dir() else set()
+    wanted = set(_entries(source)) if source.is_dir() else set()
+    if any(path.as_posix().lower() == ASSETS_MARKER for path in wanted):
+        raise ValueError(f"'{ASSETS_MARKER}' is reserved and can't be used in '{fix_path(source)}'")
     target.mkdir(parents=True, exist_ok=True)
     marker.touch()
+    # Compared as text, as paths are equal on Windows if only their case differs
+    names = {path.as_posix() for path in wanted}
+    # Files before their folders, and before copying as a renamed file can be the same file (a.png -> A.png)
+    for path in sorted(target.rglob("*"), reverse=True):
+        if path.relative_to(target).as_posix() not in names and path != marker:
+            if path.is_dir():
+                path.rmdir()
+            else:
+                path.unlink()
     # Folders before their files
     for path in sorted(wanted):
         src, dst = source / path, target / path
@@ -134,10 +155,3 @@ def sync_assets(source, target):
             if dst.is_dir():
                 shutil.rmtree(dst)
             shutil.copy2(src, dst)
-    # Files before their folders
-    for path in sorted(target.rglob("*"), reverse=True):
-        if path.relative_to(target) not in wanted and path != marker:
-            if path.is_dir():
-                path.rmdir()
-            else:
-                path.unlink()

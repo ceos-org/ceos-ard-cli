@@ -132,6 +132,7 @@ ceos-ard compile SR
 Creates only the Markdown file (`SR.md`) and the bibliography (`SR.bib`) that the documents are generated from.
 
 Like `generate`, it also copies the `assets` folder next to the output file and removes all other files from that copy.
+It fails if an `assets` folder with files exists there that the CLI didn't create, so choose another output folder or remove it.
 
 | Option | Effect |
 | --- | --- |
