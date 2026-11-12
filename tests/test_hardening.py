@@ -77,18 +77,41 @@ class TestPaths:
         assert "Symbolic links are not supported" in output
         assert "Validating PFS template" not in output
 
-    @pytest.mark.parametrize("link", ["assets", "governance/logo.png"])
+    @pytest.mark.parametrize(
+        "link",
+        [
+            # a content folder that is a link itself, links outside and deep inside of the content folders
+            "assets",
+            "link.png",
+            "governance/logo.png",
+            "sections/document/draft.md",
+            # only the top level is skipped: images can point to these
+            "assets/.hidden/logo.png",
+            "assets/node_modules/logo.png",
+        ],
+    )
     def test_symlinks_anywhere_in_the_input_folder_are_refused(self, tmp_path, link):
-        # A content folder that is a link itself, or a link outside of the content folders that images can point to
         write(tmp_path / "outside" / "logo.png", "secret")
-        (tmp_path / "content" / "governance").mkdir(parents=True)
-        target = tmp_path / "outside" / ("logo.png" if link.endswith(".png") else "")
+        is_folder = "." not in Path(link).name
+        target = tmp_path / "outside" / ("" if is_folder else "logo.png")
+        (tmp_path / "content" / link).parent.mkdir(parents=True)
         try:
-            os.symlink(target, tmp_path / "content" / link, target_is_directory=target.is_dir())
+            os.symlink(target, tmp_path / "content" / link, target_is_directory=is_folder)
         except OSError:
             pytest.skip("can't create symlinks")
         with pytest.raises(ValueError, match=Path(link).name):
             check_no_symlinks(tmp_path / "content")
+
+    @pytest.mark.parametrize("link", [".venv/bin/python", ".pixi/envs/default/bin/python", "node_modules/.bin/tool"])
+    def test_symlinks_in_environments_are_ignored(self, tmp_path, link):
+        # Environments are full of links, and nothing is read from them
+        write(tmp_path / "outside", "")
+        (tmp_path / "content" / link).parent.mkdir(parents=True)
+        try:
+            os.symlink(tmp_path / "outside", tmp_path / "content" / link)
+        except OSError:
+            pytest.skip("can't create symlinks")
+        check_no_symlinks(tmp_path / "content")
 
     @pytest.mark.skipif(os.name != "nt", reason="junctions only exist on Windows")
     def test_junctions_are_refused(self, tmp_path, monkeypatch):
