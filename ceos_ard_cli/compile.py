@@ -1,15 +1,12 @@
-import logging
 import re
 from collections import defaultdict
 from pathlib import Path
-
-from dirsync import sync
 
 from .changelog import DEFAULT_GITHUB_REPO, compile_changelog
 from .links import resolve_links, resolve_titles
 from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.deprecation import find_deprecated
-from .utils.files import check_no_symlinks, content_file, read_file, write_file
+from .utils.files import check_no_symlinks, content_file, read_file, sync_assets, write_file
 from .utils.pfs import read_pfs
 from .utils.template import read_document_sections, read_template
 
@@ -371,21 +368,14 @@ def compile(
         pfs = [pfs]
 
     check_no_symlinks(input_dir)
-    out = Path(out)
-    folder = out.parent
-    # create folder if needed
-    folder.mkdir(parents=True, exist_ok=True)
-    # sync assets (copy new/changed files, remove stale ones)
-    assets_target = folder / "assets"
+    out = Path(out).resolve()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    # The documents link to the assets relative to the output folder
     input_dir = Path(input_dir).resolve()
     assets_source = input_dir / "assets"
+    assets_target = out.parent / "assets"
     if assets_source != assets_target:
-        logger = logging.getLogger("ceos_ard_cli.dirsync")
-        logger.handlers.clear()
-        logger.propagate = False
-        logger.addHandler(logging.StreamHandler() if debug else logging.NullHandler())
-        logger.setLevel(logging.INFO if debug else logging.CRITICAL)
-        sync(str(assets_source), str(assets_target), "sync", create=True, purge=True, content=True, logger=logger)
+        sync_assets(assets_source, assets_target)
 
     data = None
     try:
