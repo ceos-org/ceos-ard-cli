@@ -111,9 +111,13 @@ ceos-ard generate NRB POL ORB GSLC -o build/Combined-SAR --id SAR --title "Combi
 ceos-ard generate-all -o build
 ```
 
-Runs `generate` for every PFS in the `pfs` folder and writes the documents to the given folder.
-Pass `-p <PFS>` (repeatable) to limit it to some of them.
-`--pdf`, `--docx`, `--self-contained`, `--stable` and the options for the document history work as for `generate`.
+Runs `generate` for every PFS in the `pfs` folder.
+
+| Option | Effect |
+| --- | --- |
+| `-o`, `--output` | Output folder, defaults to the current folder |
+| `-p`, `--pfs` | Only generates the given PFS, can be repeated |
+| `--pdf`, `--docx`, `-s`, `-r`, `--history`, `--patch-changes`, `--github-repo` | As for `generate` |
 
 ### `compile`
 
@@ -131,6 +135,7 @@ Like `generate`, it also copies the `assets` folder next to the output file and 
 | `-e`, `--editable` | Adds an "Assessment" section to the requirements, as in the Word documents |
 | `-r`, `--stable` | As for `generate` |
 | `--debug` | Writes the data of the template as `SR.debug.json` and shows stack traces |
+| `--history`, `--patch-changes`, `--github-repo` | See [Document history](#document-history) |
 
 ### `validate`
 
@@ -184,7 +189,8 @@ Edited changes and changes in renamed files keep their original commit.
 **Special cases**
 
 - If `HEAD` has a release tag for the PFS, its version must match the version of the PFS document.
-- A PFS without any release has no document history.
+- A new PFS (up to version 1.0.0) without a release has no document history.
+- A PFS above version 1.0.0 without a release (e.g. with legacy documents only) lists all recorded changes for the current version.
 - Combined documents never have a document history.
 
 ## Content rules
