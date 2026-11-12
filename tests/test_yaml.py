@@ -98,3 +98,37 @@ def test_copies_refuse_unknown_types():
     assert copy_data({"a": [1, 2.5, True, None, "x"]}) == {"a": [1, 2.5, True, None, "x"]}
     with pytest.raises(TypeError, match="set"):
         copy_data({"a": {1, 2}})
+
+
+def read_reference(tmp_path, bibtex):
+    def schema(file, base_path):
+        return Map({"ref": IdReference("./{id}.bib", base_path)})
+
+    (tmp_path / "ref.bib").write_text(bibtex, encoding="utf-8")
+    (tmp_path / "doc.yaml").write_text("ref: ref\n", encoding="utf-8")
+    return read_yaml(tmp_path / "doc.yaml", schema, tmp_path)
+
+
+def test_references_with_a_bare_doi_are_valid(tmp_path):
+    assert (
+        "10.3390/rs8060459"
+        in read_reference(tmp_path, "@article{ref,\n  title = {A},\n  doi = {10.3390/rs8060459}\n}")["ref"]
+    )
+
+
+@pytest.mark.parametrize(
+    "fields, problem",
+    [
+        (
+            "doi = {https://doi.org/10.3390/rs8060459}",
+            r"'doi' must be a bare DOI such as 10.1234/abc, found 'https://doi.org/10.3390/rs8060459'",
+        ),
+        ("doi = {doi:10.3390/rs8060459}", r"'doi' must be a bare DOI"),
+        ("doi = {10.58440/ihr-28-a14 }", r"'doi' has leading or trailing whitespace"),
+        ("author = {Dierssen, Heidi M. }", r"'author' has leading or trailing whitespace"),
+        ('title = " A"', r"'title' has leading or trailing whitespace"),
+    ],
+)
+def test_references_with_invalid_fields_fail(tmp_path, fields, problem):
+    with pytest.raises(strictyaml.YAMLValidationError, match=problem):
+        read_reference(tmp_path, f"@article{{ref,\n  {fields}\n}}")

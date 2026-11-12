@@ -1,8 +1,23 @@
+import re
+
 import bibtexparser
 import strictyaml
 
 from ..utils.files import content_file, read_file
 from ..utils.yaml import read_yaml, skip_if_being_read
+
+# The styles print the DOI after https://doi.org/, so the field must not contain the URL
+DOI = re.compile(r"10\.\d{4,9}/\S+")
+
+
+def bibtex_field_problems(entry) -> list[str]:
+    problems = []
+    for field in entry.fields:
+        if isinstance(field.value, str) and field.value != field.value.strip():
+            problems.append(f"'{field.key}' has leading or trailing whitespace")
+        elif field.key.lower() == "doi" and not DOI.fullmatch(field.value):
+            problems.append(f"'doi' must be a bare DOI such as 10.1234/abc, found '{field.value}'")
+    return problems
 
 
 class IdReference(strictyaml.ScalarValidator):
@@ -37,6 +52,8 @@ class IdReference(strictyaml.ScalarValidator):
                 chunk.expecting_but_found(f"expecting a single bibtex entry per file in {file}, found {count}")
             elif library.entries[0].key != file.stem:
                 chunk.expecting_but_found(f"expecting bibtex identifier to match file name in {file}")
+            elif problems := bibtex_field_problems(library.entries[0]):
+                chunk.expecting_but_found(f"expecting valid bibtex fields in {file}: {'; '.join(problems)}")
         else:
             content = read_file(file)
 

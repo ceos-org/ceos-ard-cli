@@ -1,7 +1,9 @@
 """Tests for the validate command."""
 
 import pytest
+from click.testing import CliRunner
 
+from ceos_ard_cli import cli
 from ceos_ard_cli.utils import files, yaml
 from ceos_ard_cli.validate import validate
 
@@ -62,3 +64,22 @@ def test_duplicate_ids_are_reported(tmp_path, capsys):
 
     output = capsys.readouterr().out.split("Checking for duplicate requirement IDs")[1]
     assert "duplicate id 'a'" in output
+
+
+def test_errors_are_counted(tmp_path):
+    (tmp_path / "valid").mkdir()
+    (tmp_path / "duplicate").mkdir()
+    # The minimal content misses the template and the document sections, which are errors too
+    errors = validate(content(tmp_path / "valid", {"a": VALID}))
+    assert errors > 0
+    assert validate(content(tmp_path / "duplicate", {"a": VALID, "b": VALID.replace("{id}", "a")})) == errors + 1
+
+
+def test_the_command_fails_on_errors(tmp_path):
+    content(tmp_path, {"a": VALID, "b": VALID.replace("{id}", "a")})
+
+    result = CliRunner().invoke(cli, ["validate", "-i", str(tmp_path)])
+
+    assert result.exit_code == 1
+    assert "duplicate id 'a'" in result.output
+    assert result.output.rstrip().endswith("error(s)")
