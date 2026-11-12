@@ -79,7 +79,10 @@ def test_failed_builds_leave_no_files(tmp_path, monkeypatch):
         return target
 
     # the package exports the click command of the same name, not the module
-    monkeypatch.setattr(importlib.import_module("ceos_ard_cli.generate"), "compile", compile)
+    module = importlib.import_module("ceos_ard_cli.generate")
+    monkeypatch.setattr(module, "compile", compile)
+    # the PDF is never printed, so no browser is needed
+    monkeypatch.setattr(module, "check_browser", lambda: None)
     # from an earlier run, it would look like the result of this one
     write(target.with_suffix(".pdf"), "old")
 
