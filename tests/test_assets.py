@@ -60,6 +60,8 @@ class TestAssets:
         source, target = tmp_path / "assets", tmp_path / "out" / "assets"
         write(source / "a.png", "old")
         sync_assets(source, target)
+        # compares the unchanged files, which must not be remembered
+        sync_assets(source, target)
         times = (source / "a.png").stat()
         write(source / "a.png", "new")
         os.utime(source / "a.png", ns=(times.st_atime_ns, times.st_mtime_ns))
