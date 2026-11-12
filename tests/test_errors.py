@@ -3,11 +3,13 @@
 Some messages are recognized by the wording of strictyaml: these tests fail if it changes."""
 
 import pytest
+import strictyaml
 
+from ceos_ard_cli.problems import to_problem, unique
 from ceos_ard_cli.schema import REQUIREMENT
 from ceos_ard_cli.utils import files, yaml
 from ceos_ard_cli.utils.yaml import read_yaml
-from ceos_ard_cli.problems import to_problem
+from ceos_ard_cli.validate import validate
 
 HEAD = "id: a\ntitle: Title\n"
 PART = "requirements:\n  threshold:\n    description: Text\n"
@@ -20,16 +22,15 @@ def empty_caches():
     files.FILE_CACHE.clear()
 
 
-def problem(tmp_path, text):
+def problem(tmp_path, text, file="requirements/a.yaml"):
     for folder in ("requirements", "glossary", "references"):
         (tmp_path / folder).mkdir(exist_ok=True)
     (tmp_path / "glossary" / "g.yaml").write_text("term: G\ndescription: Text\n", encoding="utf-8")
-    file = tmp_path / "requirements" / "a.yaml"
-    file.write_text(text, encoding="utf-8")
+    (tmp_path / "requirements" / "a.yaml").write_text(text, encoding="utf-8")
     with pytest.raises(Exception) as error:
-        read_yaml(file, REQUIREMENT, tmp_path)
+        read_yaml(tmp_path / "requirements" / "a.yaml", REQUIREMENT, tmp_path)
     result = to_problem(error.value, tmp_path.resolve())
-    assert result.file == "requirements/a.yaml"
+    assert result.file == file
     return result.message, result.line, result.column
 
 
@@ -85,20 +86,49 @@ def test_other_messages_are_kept(tmp_path):
 @pytest.mark.parametrize(
     "bibtex, message",
     [
-        ("@misc{r, title={T}", "references/r.bib isn't valid bibtex"),
-        ("@misc{r, title={T}}\n@misc{s, title={T}}", "references/r.bib must contain a single bibtex entry, found 2"),
-        ("@misc{s, title={T}}", "the bibtex key in references/r.bib must be 'r' as the file name, found 's'"),
-        (
-            "@misc{r, doi={https://doi.org/10.1/x}}",
-            "invalid bibtex fields in references/r.bib: 'doi' must be a bare DOI",
-        ),
+        ("@misc{r, title={T}", "isn't valid bibtex"),
+        ("@misc{r, title={T}}\n@misc{s, title={T}}", "must contain a single bibtex entry, found 2"),
+        ("@misc{s, title={T}}", "the bibtex key must be 'r' as the file name, found 's'"),
+        ("@misc{r, doi={https://doi.org/10.1/x}}", "invalid bibtex fields: 'doi' must be a bare DOI"),
     ],
 )
-def test_bibtex_messages(tmp_path, bibtex, message):
+def test_bibtex_problems_are_in_the_bibtex_file(tmp_path, bibtex, message):
     (tmp_path / "references").mkdir()
     (tmp_path / "references" / "r.bib").write_text(bibtex, encoding="utf-8")
 
-    assert problem(tmp_path, HEAD + PART + "references:\n  - r\n")[0].startswith(message)
+    actual, line, column = problem(tmp_path, HEAD + PART + "references:\n  - r\n", file="references/r.bib")
+
+    assert actual.startswith(message)
+    # The position of the reference is in another file
+    assert (line, column) == (None, None)
+
+
+def test_bibtex_problems_name_the_file_in_the_text(tmp_path):
+    (tmp_path / "references").mkdir()
+    (tmp_path / "references" / "r.bib").write_text("@misc{s, title={T}}", encoding="utf-8")
+    (tmp_path / "requirements").mkdir()
+    file = tmp_path / "requirements" / "a.yaml"
+    file.write_text(HEAD + PART + "references:\n  - r\n", encoding="utf-8")
+
+    with pytest.raises(strictyaml.YAMLValidationError) as error:
+        read_yaml(file, REQUIREMENT, tmp_path)
+
+    assert "references/r.bib: the bibtex key must be 'r'" in str(error.value)
+    assert 'in "requirements/a.yaml", line 7' in str(error.value)
+
+
+def test_bibtex_problems_are_reported_once(tmp_path):
+    (tmp_path / "references").mkdir()
+    (tmp_path / "references" / "r.bib").write_text("@misc{s, title={T}}", encoding="utf-8")
+    for name in ("requirements", "glossary", "sections", "pfs"):
+        (tmp_path / name).mkdir(exist_ok=True)
+    for id in ("a", "b"):
+        text = HEAD.replace("id: a", f"id: {id}") + PART + "references:\n  - r\n"
+        (tmp_path / "requirements" / f"{id}.yaml").write_text(text, encoding="utf-8")
+
+    problems = [p for p in unique(validate(tmp_path, out=lambda _: None)) if p.file == "references/r.bib"]
+
+    assert len(problems) == 1
 
 
 def test_empty_optional_text_is_allowed(tmp_path):

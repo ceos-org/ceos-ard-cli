@@ -20,6 +20,15 @@ def fail(chunk, message):
     raise YAMLValidationError(None, message, chunk)
 
 
+# A problem in the content of a referenced file that isn't YAML, e.g. a bibliography entry
+class ReferencedFileError(YAMLValidationError):
+    def __init__(self, chunk, file: str, message: str):
+        # The text names the file, at the position of the reference
+        super().__init__(None, f"{file}: {message}", chunk)
+        self.file = file
+        self.message = message
+
+
 def explain(error: MarkedYAMLError) -> tuple[str, str | None, int | None, int | None]:
     # Anything not recognized keeps the message of strictyaml.
     # Its wording is only matched for a few validation errors, each covered by a test.

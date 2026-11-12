@@ -10,7 +10,7 @@ from pathlib import Path
 from jinja2 import TemplateSyntaxError
 from strictyaml.ruamel.error import MarkedYAMLError
 
-from .strictyaml.errors import explain
+from .strictyaml.errors import ReferencedFileError, explain
 from .utils.deprecation import describe_kind
 from .utils.files import fix_path
 
@@ -42,6 +42,9 @@ class MultipleErrors(ValueError):
 
 
 def to_problem(error, input_dir: Path, file: str | None = None, pfs: str | None = None) -> Problem:
+    if isinstance(error, ReferencedFileError):
+        # Not at the reference: each file that references it would report it separately
+        return Problem(file=error.file, message=error.message)
     if isinstance(error, MarkedYAMLError):
         message, name, line, column = explain(error)
         # YAML errors are raised in the file that has the problem, which can be one that the checked file references

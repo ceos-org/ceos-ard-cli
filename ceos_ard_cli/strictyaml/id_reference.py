@@ -6,7 +6,7 @@ import strictyaml
 
 from ..utils.files import content_file, fix_path, read_file
 from ..utils.yaml import read_yaml, skip_if_being_read
-from .errors import fail
+from .errors import ReferencedFileError, fail
 
 # The styles print the DOI after https://doi.org/, so the field must not contain the URL
 DOI = re.compile(r"10\.\d{4,9}/\S+")
@@ -54,13 +54,14 @@ class IdReference(strictyaml.ScalarValidator):
             library = bibtexparser.parse_string(content)
             count = len(library.entries)
             if len(library.failed_blocks) > 0:
-                fail(chunk, f"{path} isn't valid bibtex")
+                raise ReferencedFileError(chunk, path, "isn't valid bibtex")
             elif len(library.entries) != 1:
-                fail(chunk, f"{path} must contain a single bibtex entry, found {count}")
+                raise ReferencedFileError(chunk, path, f"must contain a single bibtex entry, found {count}")
             elif (key := library.entries[0].key) != file.stem:
-                fail(chunk, f"the bibtex key in {path} must be '{file.stem}' as the file name, found '{key}'")
+                message = f"the bibtex key must be '{file.stem}' as the file name, found '{key}'"
+                raise ReferencedFileError(chunk, path, message)
             elif problems := bibtex_field_problems(library.entries[0]):
-                fail(chunk, f"invalid bibtex fields in {path}: {'; '.join(problems)}")
+                raise ReferencedFileError(chunk, path, f"invalid bibtex fields: {'; '.join(problems)}")
         else:
             content = read_file(file)
 
