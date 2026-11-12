@@ -109,6 +109,8 @@ def sync_assets(source, target):
     """Make `target` a copy of `source`: copy new and changed files, remove all others."""
     source, target = Path(source), Path(target)
     marker = target / ASSETS_MARKER
+    # It remembers results by size and modification time, which a changed file can keep
+    filecmp.clear_cache()
     if os.path.lexists(target):
         # Copying would follow links to files outside of the folder
         if os.path.islink(target) or _is_junction(target) or any(_links(target)):
