@@ -1,3 +1,4 @@
+import filecmp
 import os
 import shutil
 import stat
@@ -96,25 +97,28 @@ def get_all_files(folder, ext=".yaml", deep=True):
 ASSETS_MARKER = ".ceos-ard-cli"
 
 
-def _same_file(source, target):
-    if not target.is_file():
-        return False
-    a, b = source.stat(), target.stat()
-    return a.st_size == b.st_size and a.st_mtime_ns == b.st_mtime_ns
+def _links(folder):
+    for root, dirs, files in os.walk(folder):
+        for name in dirs + files:
+            path = Path(root, name)
+            if os.path.islink(path) or _is_junction(path):
+                yield path
 
 
 def sync_assets(source, target):
     """Make `target` a copy of `source`: copy new and changed files, remove all others."""
     source, target = Path(source), Path(target)
-    wanted = {path.relative_to(source) for path in source.rglob("*")} if source.is_dir() else set()
     marker = target / ASSETS_MARKER
-    if target.exists() and not marker.is_file():
-        # A copy made by an earlier version has no marker, but also no files of its own
-        if not target.is_dir() or any(path.relative_to(target) not in wanted for path in target.rglob("*")):
+    if os.path.lexists(target):
+        # Copying would follow links to files outside of the folder
+        if os.path.islink(target) or _is_junction(target) or any(_links(target)):
+            raise ValueError(f"Symbolic links are not supported in '{fix_path(target)}'")
+        if not target.is_dir() or (not marker.is_file() and any(target.iterdir())):
             raise ValueError(
                 f"'{fix_path(target)}' was not created by the CLI and its files would be removed: "
                 "choose another output folder or remove it"
             )
+    wanted = {path.relative_to(source) for path in source.rglob("*")} if source.is_dir() else set()
     target.mkdir(parents=True, exist_ok=True)
     marker.touch()
     # Folders before their files
@@ -124,7 +128,7 @@ def sync_assets(source, target):
             if dst.is_file():
                 dst.unlink()
             dst.mkdir(exist_ok=True)
-        elif not _same_file(src, dst):
+        elif not (dst.is_file() and filecmp.cmp(src, dst, shallow=False)):
             if dst.is_dir():
                 shutil.rmtree(dst)
             shutil.copy2(src, dst)

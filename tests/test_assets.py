@@ -1,5 +1,7 @@
 """Tests for the copy of the assets folder next to the documents."""
 
+import os
+
 import pytest
 
 from ceos_ard_cli.utils.files import ASSETS_MARKER, sync_assets
@@ -38,14 +40,53 @@ class TestAssets:
             sync_assets(source, target)
         assert tree(target) == ["theirs.txt"]
 
-    def test_adopts_copies_of_earlier_versions(self, tmp_path):
+    def test_keeps_folders_with_the_same_files(self, tmp_path):
+        # The same names don't make it a copy of the CLI
         source, target = tmp_path / "assets", tmp_path / "out" / "assets"
-        write(source / "a.png", "changed")
-        write(source / "b.png", "b")
-        write(target / "a.png", "old")
+        write(source / "a.png", "ours")
+        write(target / "a.png", "theirs")
+        with pytest.raises(ValueError, match="not created by the CLI"):
+            sync_assets(source, target)
+        assert (target / "a.png").read_text() == "theirs"
+
+    def test_uses_empty_folders(self, tmp_path):
+        source, target = tmp_path / "assets", tmp_path / "out" / "assets"
+        write(source / "a.png", "a")
+        target.mkdir(parents=True)
         sync_assets(source, target)
-        assert tree(target) == ["a.png", "b.png"]
-        assert (target / "a.png").read_text() == "changed"
+        assert tree(target) == ["a.png"]
+
+    def test_copies_files_with_the_same_size_and_time(self, tmp_path):
+        source, target = tmp_path / "assets", tmp_path / "out" / "assets"
+        write(source / "a.png", "old")
+        sync_assets(source, target)
+        times = (source / "a.png").stat()
+        write(source / "a.png", "new")
+        os.utime(source / "a.png", ns=(times.st_atime_ns, times.st_mtime_ns))
+        sync_assets(source, target)
+        assert (target / "a.png").read_text() == "new"
+
+    @pytest.mark.parametrize("link", ["a.png", "sub"])
+    def test_links_in_the_copy_are_refused(self, tmp_path, link):
+        source, target = tmp_path / "assets", tmp_path / "out" / "assets"
+        write(source / "a.png", "ours")
+        write(source / "sub" / "b.png", "ours")
+        sync_assets(source, target)
+        write(tmp_path / "outside" / "a.png", "theirs")
+        write(tmp_path / "outside" / "sub" / "b.png", "theirs")
+        if link == "sub":
+            (target / "sub" / "b.png").unlink()
+            (target / "sub").rmdir()
+        else:
+            (target / "a.png").unlink()
+        try:
+            os.symlink(tmp_path / "outside" / link, target / link, target_is_directory=link == "sub")
+        except OSError:
+            pytest.skip("can't create symlinks")
+        with pytest.raises(ValueError, match="Symbolic links are not supported"):
+            sync_assets(source, target)
+        assert (tmp_path / "outside" / "a.png").read_text() == "theirs"
+        assert (tmp_path / "outside" / "sub" / "b.png").read_text() == "theirs"
 
     def test_without_assets(self, tmp_path):
         target = tmp_path / "out" / "assets"
