@@ -77,19 +77,34 @@ class TestPaths:
         assert "Symbolic links are not supported" in output
         assert "Validating PFS template" not in output
 
-    def test_linked_content_folders_are_refused(self, tmp_path):
+    @pytest.mark.parametrize(
+        "link",
+        [
+            # a content folder that is a link itself, links outside and deep inside of the content folders
+            "assets",
+            "link.png",
+            "governance/logo.png",
+            "sections/document/draft.md",
+            # only the top level is skipped: images can point to these
+            "assets/.hidden/logo.png",
+            "assets/node_modules/logo.png",
+        ],
+    )
+    def test_symlinks_anywhere_in_the_input_folder_are_refused(self, tmp_path, link):
         write(tmp_path / "outside" / "logo.png", "secret")
-        (tmp_path / "content").mkdir()
+        is_folder = "." not in Path(link).name
+        target = tmp_path / "outside" / ("" if is_folder else "logo.png")
+        (tmp_path / "content" / link).parent.mkdir(parents=True)
         try:
-            os.symlink(tmp_path / "outside", tmp_path / "content" / "assets", target_is_directory=True)
+            os.symlink(target, tmp_path / "content" / link, target_is_directory=is_folder)
         except OSError:
             pytest.skip("can't create symlinks")
-        with pytest.raises(ValueError, match="assets"):
+        with pytest.raises(ValueError, match=Path(link).name):
             check_no_symlinks(tmp_path / "content")
 
-    @pytest.mark.parametrize("link", [".venv/bin/python", "node_modules/.bin/tool", "link"])
-    def test_symlinks_outside_of_the_content_folders_are_ignored(self, tmp_path, link):
-        # Nothing is read from there, and environments are full of links
+    @pytest.mark.parametrize("link", [".venv/bin/python", ".pixi/envs/default/bin/python", "node_modules/.bin/tool"])
+    def test_symlinks_in_environments_are_ignored(self, tmp_path, link):
+        # Environments are full of links, and nothing is read from them
         write(tmp_path / "outside", "")
         (tmp_path / "content" / link).parent.mkdir(parents=True)
         try:

@@ -24,29 +24,23 @@ def content_file(base, relative):
     return file
 
 
-# The folders the CLI reads files from; ids and @title: references are confined by content_file
-CONTENT_FOLDERS = ["assets", "glossary", "pfs", "references", "requirements", "sections", "templates"]
-
-
-def _is_link(path):
-    return os.path.islink(path) or (os.path.lexists(path) and _is_junction(path))
+# Folders in the input folder that are not checked for links, besides the ones that start with a dot (e.g. .venv):
+# environments are full of links. Only skipped at the top level, where the CLI reads no files from them.
+SKIPPED_FOLDERS = ["node_modules"]
 
 
 def check_no_symlinks(input_dir):
-    # They could lead the documents to files outside of the input folder. Only the content folders are
-    # checked: nothing else is read, and e.g. .venv or node_modules are full of links
+    # They could lead the documents to files outside of the input folder: images and other
+    # relative paths can point anywhere inside of it, so the whole folder is checked
     input_dir = Path(input_dir)
     found = []
-    for folder in CONTENT_FOLDERS:
-        folder = input_dir / folder
-        if _is_link(folder):
-            found.append(folder)
-            continue
-        for root, dirs, files in os.walk(folder):
-            for name in dirs + files:
-                path = Path(root, name)
-                if _is_link(path):
-                    found.append(path)
+    for root, dirs, files in os.walk(input_dir):
+        if Path(root) == input_dir:
+            dirs[:] = [name for name in dirs if not name.startswith(".") and name not in SKIPPED_FOLDERS]
+        for name in dirs + files:
+            path = Path(root, name)
+            if os.path.islink(path) or _is_junction(path):
+                found.append(path)
     if found:
         paths = ", ".join(str(path.relative_to(input_dir)) for path in found[:5])
         raise ValueError(f"Symbolic links are not supported in the input folder: {paths}")

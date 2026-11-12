@@ -103,6 +103,7 @@ To limit what the content can do while the documents are generated:
   and `label`, `columns` and `widths`, which the template uses, are allowed.
 - Only the metadata of the front matter of `template.md` is allowed, so the content can't add any, e.g. `css`.
 - IDs and `@title:` references must point to files inside the input directory, and symbolic links are refused.
+  Only top-level folders that start with a dot (e.g. `.venv`) and `node_modules` may contain links.
 - Chromium renders the PDF without JavaScript and only loads files from the output directory.
 
 The HTML, Word and PDF templates that replace the built-in ones from the input directory are trusted and not checked.
