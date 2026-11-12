@@ -41,6 +41,7 @@ class TestCLI:
         assert "--history" in result.output
         assert "--github-repo" in result.output
         assert "--patch-changes" in result.output
+        assert "--offline" in result.output
 
     @pytest.mark.parametrize("command", ["compile", "generate"])
     def test_pfs_is_required(self, command):

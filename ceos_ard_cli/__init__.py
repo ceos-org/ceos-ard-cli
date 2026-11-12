@@ -63,6 +63,13 @@ history_options = options(
         help="The GitHub repository (owner/name) to read the releases from for the document history",
     ),
     click.option(
+        "--offline",
+        is_flag=True,
+        default=False,
+        help="Reads the releases for the document history from the git tags instead of GitHub, "
+        "which needs no network access. The dates are the ones of the tags and pre-releases are listed, too.",
+    ),
+    click.option(
         "--patch-changes",
         is_flag=True,
         default=False,
