@@ -167,3 +167,14 @@ def test_pfs_must_be_a_folder_name(tmp_path, pfs):
     write(tmp_path / "requirements" / "document.yaml", "title: Secret\n")
     with pytest.raises(ValueError, match="Invalid PFS"):
         read_pfs(pfs, tmp_path)
+
+
+def test_stable_documents_get_a_file_name_for_any_version(tmp_path, failing_compile, monkeypatch):
+    module, _ = failing_compile
+    # the version of combined documents
+    monkeypatch.setattr(module, "read_data", lambda *args, **kwargs: {"version": "n/a"})
+    monkeypatch.setattr(module, "compile_bibtex", lambda *args, **kwargs: None)
+    write(tmp_path / "out" / "A-B.md", "draft")
+
+    assert module.compile(["A", "B"], tmp_path / "out" / "A-B", tmp_path, stable=True).name == "A-B-vn-a"
+    assert (tmp_path / "out" / "A-B.md").read_text(encoding="utf-8") == "draft"

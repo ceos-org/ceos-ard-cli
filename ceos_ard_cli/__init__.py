@@ -7,7 +7,7 @@ from .check_changes import check_changes as check_changes_
 from .compile import compile as compile_
 from .generate import generate as generate_
 from .generate import generate_all as generate_all_
-from .utils.pfs import check_content_folder
+from .utils.pfs import check_input
 from .validate import validate as validate_
 from .version import __version__
 
@@ -119,7 +119,7 @@ def compile(pfs, output, input_dir, editable, stable, debug, **history):
     print(f"CEOS-ARD CLI {__version__} - Compile {' + '.join(pfs)} as Markdown\n")
 
     try:
-        check_content_folder(input_dir)
+        check_input(input_dir, pfs)
         compile_(pfs, output or "-".join(pfs), input_dir, editable=editable, stable=stable, debug=debug, **history)
     except Exception as e:
         if debug:
@@ -150,7 +150,7 @@ def generate(pfs, output, input_dir, self_contained, pdf, docx, stable, id, titl
     metadata = {"id": id, "title": title, "version": version, "type": pfs_type}
     output = output or id or "-".join(pfs)
     try:
-        check_content_folder(input_dir)
+        check_input(input_dir, pfs)
         generate_(pfs, output, input_dir, self_contained, pdf, docx, stable, metadata, **history)
     except Exception as e:
         fail(e)
@@ -181,7 +181,7 @@ def generate_all(output, input_dir, self_contained, pdf, docx, pfs, stable, **hi
     """
     print(f"CEOS-ARD CLI {__version__} - Generate all PFS\n")
     try:
-        check_content_folder(input_dir)
+        check_input(input_dir, pfs)
         errors = generate_all_(output, input_dir, self_contained, pdf, docx, list(pfs), stable, **history)
     except Exception as e:
         fail(e)

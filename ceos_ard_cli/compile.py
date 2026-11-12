@@ -393,7 +393,9 @@ def compile(
         data = read_data(pfs, input_dir, stable, metadata)
 
         if stable:
-            out = out.with_name(f"{out.name}-v{data['version']}")
+            # A version can have characters that file names can't, e.g. n/a for combined documents
+            version = re.sub(r'[\\/:*?"<>|]+', "-", data["version"])
+            out = out.with_name(f"{out.name}-v{version}")
 
         # write a json file for debugging
         if debug:
