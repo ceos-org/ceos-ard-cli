@@ -7,6 +7,7 @@ from .changelog import DEFAULT_GITHUB_REPO
 from .compile import compile, remove_outputs
 from .toolchain import BROWSER_MISSING, check_browser, check_tools
 from .utils.files import read_file
+from .utils.pfs import list_pfs
 from .utils.template import FILTERS_DIR, template_file, template_metadata_keys
 
 # Chromium only gets the output folder, served from an address that doesn't exist
@@ -40,34 +41,30 @@ def generate_all(
     history: bool = False,
     github_repo: str = DEFAULT_GITHUB_REPO,
     patch_changes: bool = False,
+    offline: bool = False,
 ):
-    # read all folders from the pfs folder
     input_dir = Path(input_dir).resolve()
-    input_pfs_folder = input_dir / "pfs"
     output = Path(output)
     errors = 0
-    for folder in input_pfs_folder.iterdir():
-        if folder.is_dir():
-            pfs = folder.stem
-            if len(pfs_list) > 0 and pfs not in pfs_list:
-                continue
-            print(pfs)
-            try:
-                generate(
-                    pfs,
-                    output / pfs,
-                    input_dir,
-                    self_contained,
-                    no_pdf,
-                    no_docx,
-                    stable,
-                    history=history,
-                    github_repo=github_repo,
-                    patch_changes=patch_changes,
-                )
-            except Exception as e:
-                print(f"Error generating {folder}: {e}")
-                errors += 1
+    for pfs in pfs_list or list_pfs(input_dir):
+        print(pfs)
+        try:
+            generate(
+                pfs,
+                output / pfs,
+                input_dir,
+                self_contained,
+                no_pdf,
+                no_docx,
+                stable,
+                history=history,
+                github_repo=github_repo,
+                patch_changes=patch_changes,
+                offline=offline,
+            )
+        except Exception as e:
+            print(f"Error generating {pfs}: {e}")
+            errors += 1
 
     return errors
 
@@ -84,6 +81,7 @@ def generate(
     history: bool = False,
     github_repo: str = DEFAULT_GITHUB_REPO,
     patch_changes: bool = False,
+    offline: bool = False,
 ):
     if isinstance(pfs, str):
         pfs = [pfs]
@@ -99,6 +97,7 @@ def generate(
         "history": history,
         "github_repo": github_repo,
         "patch_changes": patch_changes,
+        "offline": offline,
     }
 
     target = None
