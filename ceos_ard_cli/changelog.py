@@ -565,7 +565,7 @@ def _collect_nested(data, input_dir, add):
             _collect_nested(value, input_dir, add)
 
 
-def collect_former_members(releases, members_by_version, current_members, input_dir, history):
+def collect_former_members(releases, members_by_version, current_members, input_dir, history, pfs=None):
     """Collect the changes of building blocks that were part of a release, but are not part of the PFS anymore."""
     input_dir = Path(input_dir).resolve()
     # the newest release that contained the building block, to read deleted files from
@@ -585,7 +585,9 @@ def collect_former_members(releases, members_by_version, current_members, input_
             content = parse_yaml(text)
         except Exception as e:
             message = f"Can't read the changes of the former building block {filepath}: {e}"
-            report(f"WARNING: {message}", Problem(severity=WARNING, message=message))
+            # A deleted file is read from the release, so it can't be fixed in the content folder
+            source = {"file": filepath} if file.is_file() else {"pfs": pfs}
+            report(f"WARNING: {message}", Problem(**source, severity=WARNING, message=message))
             continue
         kind, name = describe_kind(content)
         entries.extend(make_entries(content.get("changes"), make_block(kind.capitalize(), name, filepath), history))
@@ -648,7 +650,7 @@ def build_changelog(data, releases, history, input_dir=".", pfs=None, patch_chan
 
     entries = collect_changes(data, input_dir, history, pfs)
     current_members = {e["block"]["filepath"] for e in entries}
-    entries += collect_former_members(released, members_by_version, current_members, input_dir, history)
+    entries += collect_former_members(released, members_by_version, current_members, input_dir, history, pfs)
 
     buckets = [_make_bucket(r["version"], r["tuple"], r["date"], r["tag"], r["url"]) for r in released]
     # changes that are not part of any release, also if the current version has been released already
