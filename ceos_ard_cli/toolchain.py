@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 import subprocess
@@ -8,6 +9,9 @@ from pathlib import Path
 PACKAGE = Path(__file__).parent
 PACKAGE_NAME = "ceos-ard-cli"
 TOOLS = ["pandoc", "pandoc-crossref"]
+# Set to skip the checks where the environment is known to be right, e.g. on a server
+SKIP_CHECK = "CEOS_ARD_SKIP_TOOL_CHECK"
+BROWSER_MISSING = "The browser for the PDF is not installed: run `pixi run install-browser`"
 
 
 @cache
@@ -41,6 +45,8 @@ def installed_version(tool: str) -> str | None:
 @cache
 def check_tools() -> None:
     """Fails without the tools that generate the documents and warns about versions the CLI isn't tested with."""
+    if os.environ.get(SKIP_CHECK):
+        return
     missing = [tool for tool in TOOLS if not shutil.which(tool)]
     if missing:
         raise ValueError(f"{' and '.join(missing)} not found: run the CLI in its pixi environment, see the README")
@@ -48,3 +54,16 @@ def check_tools() -> None:
         installed = installed_version(tool)
         if installed and installed != pinned:
             print(f"WARNING: {tool} {installed} is used, but the CLI is tested with {tool} {pinned}")
+
+
+@cache
+def check_browser() -> None:
+    """Fails without the browser that prints the PDF, before the other documents are generated."""
+    if os.environ.get(SKIP_CHECK):
+        return
+    # Only loaded for PDFs, as it takes a while
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        if not Path(p.chromium.executable_path).is_file():
+            raise ValueError(BROWSER_MISSING)

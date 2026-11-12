@@ -80,6 +80,8 @@ def test_failed_builds_leave_no_files(tmp_path, monkeypatch):
     module = importlib.import_module("ceos_ard_cli.generate")
     monkeypatch.setattr(module, "prepare", lambda *args, **kwargs: ({}, target))
     monkeypatch.setattr(module, "compile_files", compile_files)
+    # the PDF is never printed, so no browser is needed
+    monkeypatch.setattr(module, "check_browser", lambda: None)
     # from an earlier run, it would look like the result of this one
     write(target.with_suffix(".pdf"), "old")
 
