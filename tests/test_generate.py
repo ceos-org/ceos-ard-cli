@@ -160,7 +160,7 @@ def test_stable_documents_keep_dots_in_their_name(tmp_path, failing_compile, mon
     assert module.compile("SR", tmp_path / "out" / "SR-1.5", tmp_path, stable=True).name == "SR-1.5-v1.0.0"
 
 
-@pytest.mark.parametrize("pfs", ["../requirements", "a/b", "a\\b", "..", ""])
+@pytest.mark.parametrize("pfs", ["../requirements", "a/b", "a\\b", "..", "", "C:", "C:x"])
 def test_pfs_must_be_a_folder_name(tmp_path, pfs):
     from ceos_ard_cli.utils.pfs import read_pfs
 
