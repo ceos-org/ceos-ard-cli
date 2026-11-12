@@ -42,9 +42,44 @@ class TestCLI:
         assert "--github-repo" in result.output
         assert "--patch-changes" in result.output
 
+    @pytest.mark.parametrize("command", ["compile", "generate"])
+    def test_pfs_is_required(self, command):
+        result = CliRunner().invoke(cli, [command])
+
+        assert result.exit_code == 2
+        assert "Missing argument" in result.output
+
+    @pytest.mark.parametrize("command", [["compile", "SR"], ["generate-all"]])
+    def test_input_must_be_a_content_folder(self, command, tmp_path):
+        result = CliRunner().invoke(cli, [*command, "-i", str(tmp_path), "-o", str(tmp_path / "out" / "x")])
+
+        assert result.exit_code == 1
+        assert "has no 'pfs' folder" in result.output
+
     def test_check_changes_help(self):
         runner = CliRunner()
         result = runner.invoke(cli, ["check-changes", "--help"])
 
         assert result.exit_code == 0
         assert "--base" in result.output
+
+    @pytest.mark.parametrize(
+        ("command", "message"),
+        [
+            (["compile", "../requirements"], "Invalid PFS '../requirements'"),
+            (["generate", "C:"], "Invalid PFS 'C:'"),
+            (["generate", "TYPO"], "Unknown PFS 'TYPO', expected one of: SR"),
+            (["generate-all", "--pfs", "TYPO"], "Unknown PFS 'TYPO', expected one of: SR"),
+        ],
+    )
+    def test_pfs_are_checked_before_anything_is_written(self, command, message, tmp_path):
+        (tmp_path / "content" / "pfs" / "SR").mkdir(parents=True)
+        (tmp_path / "content" / "assets").mkdir()
+        (tmp_path / "requirements.md").write_text("theirs", encoding="utf-8")
+        output = [] if command[0] == "compile" else ["-o", str(tmp_path / "out" / "x")]
+
+        result = CliRunner().invoke(cli, [*command, "-i", str(tmp_path / "content"), *output])
+
+        assert result.exit_code == 1
+        assert message in result.output
+        assert sorted(p.name for p in tmp_path.iterdir()) == ["content", "requirements.md"]

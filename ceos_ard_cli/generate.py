@@ -8,7 +8,9 @@ from urllib.parse import quote, unquote, urlsplit
 
 from .changelog import DEFAULT_GITHUB_REPO
 from .compile import compile, remove_outputs
+from .toolchain import BROWSER_MISSING, check_browser, check_tools
 from .utils.files import read_file
+from .utils.pfs import list_pfs
 from .utils.template import FILTERS_DIR, TEMPLATES_DIR, template_file, template_metadata_keys
 
 # Chromium only gets the output folder, served from an address that doesn't exist
@@ -66,33 +68,27 @@ def generate_all(
     github_repo: str = DEFAULT_GITHUB_REPO,
     patch_changes: bool = False,
 ):
-    # read all folders from the pfs folder
     input_dir = Path(input_dir).resolve()
-    input_pfs_folder = input_dir / "pfs"
     output = Path(output)
     errors = 0
-    for folder in input_pfs_folder.iterdir():
-        if folder.is_dir():
-            pfs = folder.stem
-            if len(pfs_list) > 0 and pfs not in pfs_list:
-                continue
-            print(pfs)
-            try:
-                generate(
-                    pfs,
-                    output / pfs,
-                    input_dir,
-                    self_contained,
-                    no_pdf,
-                    no_docx,
-                    stable,
-                    history=history,
-                    github_repo=github_repo,
-                    patch_changes=patch_changes,
-                )
-            except Exception as e:
-                print(f"Error generating {folder}: {e}")
-                errors += 1
+    for pfs in pfs_list or list_pfs(input_dir):
+        print(pfs)
+        try:
+            generate(
+                pfs,
+                output / pfs,
+                input_dir,
+                self_contained,
+                no_pdf,
+                no_docx,
+                stable,
+                history=history,
+                github_repo=github_repo,
+                patch_changes=patch_changes,
+            )
+        except Exception as e:
+            print(f"Error generating {pfs}: {e}")
+            errors += 1
 
     return errors
 
@@ -113,6 +109,9 @@ def generate(
     if isinstance(pfs, str):
         pfs = [pfs]
 
+    check_tools()
+    if not no_pdf:
+        check_browser()
     input_dir = Path(input_dir).resolve()
     output = Path(output).resolve()
     options = {
@@ -157,7 +156,7 @@ def local_file(folder: Path, url: str) -> Path | None:
 
 def run_playwright(out: Path, input_dir: Path):
     # Only loaded for PDFs, as it takes a while
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import Error, sync_playwright
 
     html = Path(f"{out}.html").resolve()
     folder = html.parent
@@ -170,7 +169,12 @@ def run_playwright(out: Path, input_dir: Path):
             route.abort()
 
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        try:
+            browser = p.chromium.launch()
+        except Error as e:
+            if "Executable doesn't exist" in str(e):
+                raise ValueError(BROWSER_MISSING) from e
+            raise
         page = browser.new_page(java_script_enabled=False)
         page.route("**/*", route)
         # Encoded, so that e.g. a # in the file name isn't read as the start of a fragment
