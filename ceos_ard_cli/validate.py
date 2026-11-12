@@ -2,13 +2,19 @@ import copy
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from pathlib import Path
+
+from jinja2 import TemplateSyntaxError
+from strictyaml.ruamel.error import MarkedYAMLError
 
 from .compile import merge_bibtex, read_data, render_markdown
 from .generate import pandoc_env, pandoc_errors
 from .links import resolve_links, resolve_titles
-from .schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS, REQUIREMENT
-from .utils.deprecation import find_deprecated
+from .schema import DOCUMENT_SECTION_PATH, DOCUMENT_SECTIONS, GLOSSARY, REQUIREMENT, SECTION
+from .strictyaml.errors import explain
+from .utils.deprecation import describe, describe_kind, find_deprecated_blocks
 from .utils.files import FILE_CACHE, check_no_symlinks, fix_path, get_all_files, get_all_folders
 from .utils.template import FILTERS_DIR, check_template, read_document_section, used_document_sections
 from .utils.yaml import read_yaml
@@ -18,11 +24,45 @@ SANITIZE_FILTERS = ["sanitize.lua"]
 CHECK_FILTERS = ["links.lua"]
 CHECK_TIMEOUT = 60
 
+ERROR = "error"
+WARNING = "warning"
+TEMPLATE_PATH = "templates/template.md"
 
-def log(id, error=None) -> bool:
-    message = str(error) if error is not None else "OK"
-    print(f"- {id}: {message}")
-    return error is not None
+
+@dataclass(frozen=True, kw_only=True)
+class Problem:
+    file: str | None = None
+    pfs: str | None = None
+    line: int | None = None
+    column: int | None = None
+    severity: str = ERROR
+    message: str
+
+    def to_dict(self) -> dict:
+        return {key: value for key, value in asdict(self).items() if value is not None}
+
+
+def to_problem(error, input_dir: Path, file: str | None = None, pfs: str | None = None) -> Problem:
+    if isinstance(error, MarkedYAMLError):
+        message, name, line, column = explain(error)
+        # YAML errors are raised in the file that has the problem, which can be one that the checked file references
+        if name is not None and (input_dir / name).is_file():
+            return Problem(file=name, line=line, column=column, message=message)
+        return Problem(file=file, pfs=pfs, message=message)
+    if isinstance(error, TemplateSyntaxError) and error.name and (input_dir / "templates" / error.name).is_file():
+        return Problem(file=f"templates/{error.name}", line=error.lineno, message=error.message)
+    return Problem(file=file, pfs=pfs, message=str(error))
+
+
+def unique(problems: list[Problem]) -> list[Problem]:
+    return list(dict.fromkeys(problems))
+
+
+def relative_path(path, input_dir: Path) -> str | None:
+    try:
+        return fix_path(Path(path).resolve().relative_to(input_dir))
+    except ValueError:
+        return None
 
 
 def check_content(markdown: str, input_dir: Path, bibtex: str = "") -> list[str]:
@@ -74,39 +114,41 @@ def check_rendering(data: dict, input_dir: Path) -> list[str]:
     return errors
 
 
-def validate(input_dir) -> int:
+def validate(input_dir, out: Callable[[str], None] = print) -> list[Problem]:
+    """All problems in the order they were found, `out` gets the text output while validating."""
     input_dir = Path(input_dir).resolve()
-    errors = 0
-    print("Checking for symbolic links")
-    error = None
+    problems = []
+
+    def check(id, error=None, file=None, pfs=None):
+        out(f"- {id}: {'OK' if error is None else error}")
+        if error is not None:
+            problems.append(to_problem(error, input_dir, file, pfs))
+
+    out("Checking for symbolic links")
     try:
         check_no_symlinks(input_dir)
     except Exception as e:
-        error = e
-    finally:
-        errors += log("content folder", error)
-    if error is not None:
+        check("content folder", e)
         # The other checks would read the files the links point to
-        return errors
+        return problems
+    check("content folder")
 
-    # Validate PFS template
-    print("Validating PFS template")
-    error = None
+    out("Validating PFS template")
     try:
         check_template(input_dir)
     except Exception as e:
-        error = e
-    finally:
-        errors += log("templates/template.md", error)
+        check(TEMPLATE_PATH, e, file=TEMPLATE_PATH)
+    else:
+        check(TEMPLATE_PATH)
 
-    print("Validating document sections")
+    out("Validating document sections")
     try:
         used = used_document_sections(input_dir)
     except Exception:
         # the template check above reports the problem
         used = set(DOCUMENT_SECTIONS)
     for id in DOCUMENT_SECTIONS:
-        path = DOCUMENT_SECTION_PATH.format(id=id)
+        path = fix_path(Path(DOCUMENT_SECTION_PATH.format(id=id)))
         file = input_dir / path
         error = None
         try:
@@ -118,77 +160,93 @@ def validate(input_dir) -> int:
                 error = "missing, not used by the template"
         except Exception as e:
             error = e
-        finally:
-            errors += log(fix_path(Path(path)), error)
+        check(path, error, file=path)
 
     # Validate all PFS
     # This also validates all files that are used/referenced in the PFS
-    print("Validating PFS")
+    out("Validating PFS")
     if not shutil.which("pandoc"):
-        print("- pandoc not found: the content is only checked by `generate`")
+        message = "pandoc not found: the content is only checked by `generate`"
+        out(f"- {message}")
+        problems.append(Problem(severity=WARNING, message=message))
     input_pfs_folder = input_dir / "pfs"
     all_pfs = get_all_folders(input_pfs_folder)
+    all_read = True
     for folder in all_pfs:
         pfs = folder.stem
-        error = None
+        errors = []
         deprecated = []
-        link_errors = []
-        render_errors = []
         try:
             # Read once: reading is by far the slowest part, so the checks below work on copies
             data = read_data([pfs], input_dir, warn=False)
-            deprecated = find_deprecated(data)
+            deprecated = find_deprecated_blocks(data)
             links = copy.deepcopy(data)
             # check that all @title: references point to existing building blocks
-            link_errors = resolve_titles(links, input_dir)
+            errors = resolve_titles(links, input_dir)
             # check that all dependencies and sections links can be resolved
-            link_errors += resolve_links(links, input_dir)
-            if not link_errors:
-                render_errors = check_rendering(data, input_dir)
+            errors += resolve_links(links, input_dir)
+            if not errors:
+                errors = check_rendering(data, input_dir)
         except Exception as e:
-            error = e
-        finally:
-            errors += log(pfs, error) + len(link_errors) + len(render_errors)
-            for message in link_errors:
-                print(f"  - ERROR: {message}")
-            for message in render_errors:
-                print(f"  - ERROR: {message}")
-            for descriptor in deprecated:
-                print(f"  - WARNING: {descriptor} is deprecated")
+            all_read = False
+            check(pfs, e, pfs=pfs)
+        else:
+            check(pfs)
+        for message in errors:
+            out(f"  - ERROR: {message}")
+            problems.append(Problem(pfs=pfs, message=message))
+        for block in deprecated:
+            out(f"  - WARNING: {describe(block)} is deprecated")
+            kind, name = describe_kind(block)
+            file = relative_path(block["filepath"], input_dir) if block.get("filepath") else None
+            message = f"{kind} '{name}' is deprecated"
+            problems.append(Problem(file=file, pfs=None if file else pfs, severity=WARNING, message=message))
 
-    # todo: check all files, even if unused
-    print("Checking for files not referenced by any PFS (none of them gets validated)")
-    # Get a list of all files that were read during PFS validation
-    used_files = list(FILE_CACHE.keys())
+    out("Checking for files not referenced by any PFS")
+    # A PFS that can't be read stops reading at the problem, so its other files would look unused
+    if not all_read:
+        out("- skipped, as not all PFS could be read")
+    # The files that were read during PFS validation
+    used_files = set(FILE_CACHE.keys())
     all_req_files = get_all_files(input_dir / "requirements")
-    # Get all files in the glossary, requirements, and sections
-    all_files = get_all_files([input_dir / "glossary", input_dir / "sections"])
-    all_files.extend(all_req_files)
-    # Print all files that are not refernced by any PFS
-    for file in all_files:
-        filepath = str(file.absolute())
-        if filepath not in used_files:
-            rel_path = file.relative_to(input_dir)
-            print(f"- {rel_path}")
+    # The requirements are validated by the check for duplicate IDs below
+    all_files = [(file, GLOSSARY) for file in get_all_files(input_dir / "glossary")]
+    all_files += [(file, SECTION) for file in get_all_files(input_dir / "sections")]
+    all_files += [(file, None) for file in all_req_files]
+    for file, schema in all_files:
+        if str(file.absolute()) in used_files:
+            continue
+        rel_path = file.relative_to(input_dir)
+        # Templates for new building blocks, not meant to be used
+        if all_read and file.name != "_template.yaml":
+            out(f"- {rel_path}")
+            problems.append(Problem(file=fix_path(rel_path), severity=WARNING, message="not referenced by any PFS"))
+        if schema is None:
+            continue
+        try:
+            read_yaml(file, schema, input_dir)
+        except Exception as e:
+            out(f"  - ERROR: {e}" if all_read else f"- {rel_path}: {e}")
+            problems.append(to_problem(e, input_dir, file=fix_path(rel_path)))
 
-    # Check for duplicate requirement IDs
-    print("Checking for duplicate requirement IDs")
+    out("Checking for duplicate requirement IDs")
     ids = {}
     for file in all_req_files:
         # Before reading, so that a file that can't be read is reported under its own name
         rel_path = file.relative_to(input_dir)
+        path = fix_path(rel_path)
         try:
             data = read_yaml(file, REQUIREMENT, input_dir)
             if not isinstance(data, dict):
                 continue
             req_id = data.get("id")
             if not req_id:
-                errors += log(rel_path, "missing id")
+                check(rel_path, "missing id", file=path)
                 continue
             if req_id in ids:
-                errors += log(rel_path, f"duplicate id '{req_id}' (also in {ids[req_id]})")
+                check(rel_path, f"duplicate id '{req_id}' (also in {ids[req_id]})", file=path)
             else:
-                ids[req_id] = rel_path
+                ids[req_id] = path
         except Exception as e:
-            errors += log(rel_path, e)
-    return errors
+            check(rel_path, e, file=path)
+    return problems

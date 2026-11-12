@@ -1,3 +1,5 @@
+import contextlib
+import json
 import sys
 
 import click
@@ -8,6 +10,7 @@ from .compile import compile as compile_
 from .generate import generate as generate_
 from .generate import generate_all as generate_all_
 from .utils.pfs import check_input
+from .validate import ERROR, Problem, unique
 from .validate import validate as validate_
 from .version import __version__
 
@@ -197,16 +200,36 @@ def generate_all(output, input_dir, self_contained, pdf, docx, pfs, stable, **hi
     default=".",
     help="Input directory for PFS files, defaults to the current folder",
 )
-def validate(input_dir):
+@click.option(
+    "--format",
+    "-f",
+    "format_",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    show_default=True,
+    help="Output format, json prints a list of the problems with file, line, column, severity and message",
+)
+def validate(input_dir, format_):
     """
-    Validates (most of) the building blocks.
+    Validates the building blocks, the PFS, the template and the document sections.
     """
+    if format_ == "json":
+        try:
+            # Only the JSON goes to stdout
+            with contextlib.redirect_stdout(sys.stderr):
+                problems = unique(validate_(input_dir, out=lambda _: None))
+        except Exception as e:
+            problems = [Problem(message=str(e))]
+        print(json.dumps([problem.to_dict() for problem in problems], indent=2))
+        sys.exit(1 if any(problem.severity == ERROR for problem in problems) else 0)
+
     print(f"CEOS-ARD CLI {__version__} - Validate building blocks\n")
     try:
-        errors = validate_(input_dir)
+        problems = validate_(input_dir)
     except Exception as e:
         print(e)
         sys.exit(1)
+    errors = sum(1 for problem in problems if problem.severity == ERROR)
     if errors:
         print(f"\nFound {errors} error(s)")
         sys.exit(1)

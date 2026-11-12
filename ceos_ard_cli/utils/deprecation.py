@@ -5,6 +5,10 @@ def find_deprecated(data):
     Works on both unresolved (read_pfs) and resolved (resolve_refs/bubble_up) documents.
     Returns a list of human-readable descriptors, one per building block.
     """
+    return [describe(block) for block in find_deprecated_blocks(data)]
+
+
+def find_deprecated_blocks(data):
     found = {}
     _find_deprecated(data, found)
     return list(found.values())
@@ -16,7 +20,7 @@ def _find_deprecated(data, found):
             # deduplicate building blocks that are used multiple times
             key = data.get("filepath", id(data))
             if key not in found:
-                found[key] = describe(data)
+                found[key] = data
         for v in data.values():
             _find_deprecated(v, found)
     elif isinstance(data, list):
