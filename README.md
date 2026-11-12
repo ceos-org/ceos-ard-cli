@@ -5,6 +5,7 @@ CLI for working with the [CEOS-ARD building blocks and PFSes](https://github.com
 - [Getting Started](#getting-started)
   - [Installation](#installation)
   - [Run the CLI](#run-the-cli)
+  - [GitHub Actions](#github-actions)
 - [Commands](#commands)
   - [`ceos-ard compile`: Compile PFS document to a Markdown file](#ceos-ard-compile-compile-pfs-document-to-a-markdown-file)
   - [`ceos-ard generate`: Create Word/HTML/PDF documents for a single PFS](#ceos-ard-generate-create-wordhtmlpdf-documents-for-a-single-pfs)
@@ -42,6 +43,20 @@ In order to make working with CEOS-ARD easier we have developed command-line int
 3. Run `ceos-ard` with the command you want to execute, e.g. `ceos-ard generate-all -o build`
 
 See the [available commands](#commands) for further details.
+
+### GitHub Actions
+
+The repository provides an action that installs the CLI with the pandoc, pandoc-crossref and Python versions that the release locks:
+
+```yaml
+- uses: ceos-org/ceos-ard-cli@v0.8.0
+  with:
+    browser: false # optional, skips the browser that the PDF generation needs
+    requirements-file: requirements.txt # optional, fails unless it requires the same CLI version
+```
+
+The [CEOS-ARD Editor](https://editor.ceos-ard.moregeo.it) uses the CLI version in the `requirements.txt` of the content repository,
+so pass it as `requirements-file` to generate the documents with the same version (required with `~=` or `==`).
 
 ## Commands
 

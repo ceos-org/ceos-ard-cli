@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: prefix-dev/setup-pixi@v0.11.2
+      - uses: prefix-dev/setup-pixi@v0.11.3
         with:
           pixi-version: v0.49.0
           cache: true
@@ -42,7 +42,7 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v7
-      - uses: prefix-dev/setup-pixi@v0.11.2
+      - uses: prefix-dev/setup-pixi@v0.11.3
         with:
           pixi-version: v0.49.0
           cache: true
@@ -51,3 +51,16 @@ jobs:
         run: pixi run -e ${{ matrix.environment }} install-dev
       - name: Execute tests
         run: pixi run -e ${{ matrix.environment }} python --version && pixi run -e ${{ matrix.environment }} test
+
+  action:
+    name: Setup action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Require this version, like the content repository does
+        run: echo "ceos-ard-cli~=$(sed -E 's/.*"(.*)".*/\1/' ceos_ard_cli/version.py)" > "$RUNNER_TEMP/requirements.txt"
+      - uses: ./
+        with:
+          requirements-file: ${{ runner.temp }}/requirements.txt
+      - name: Run the CLI from the activated environment
+        run: ceos-ard validate --help
