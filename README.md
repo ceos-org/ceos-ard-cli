@@ -93,13 +93,14 @@ Creates `SR.html`, `SR.docx` and `SR.pdf` for the PFS in `pfs/SR`, together with
 | `-o`, `--output` | Output file without file extension, e.g. `-o build/SR`. Defaults to the name of the PFS. |
 | `--pdf` | **Skips** the PDF |
 | `--docx` | **Skips** the Word document |
-| `-s`, `--self-contained` | Embeds images and styles into the HTML file |
+| `-s`, `--self-contained` | Embeds images, fonts and styles into the HTML file |
 | `-r`, `--stable` | Removes the `-draft` suffix from the version and adds the version to the file name, e.g. `SR-v1.0.0.html` |
 | `--id`, `--title`, `--version`, `--pfs-type` | Override the metadata of the document |
 | `--history`, `--patch-changes`, `--github-repo`, `--offline` | See [Document history](#document-history) |
 | `-f json`, `--format json` | Prints the [problems as JSON](#problems-as-json) |
 
 The HTML document is always created.
+Without `--self-contained`, it needs the `assets` and `fonts` folders that are written next to it.
 
 Before generating, the CLI checks that pandoc, pandoc-crossref and, for PDFs, the browser are available,
 and warns about pandoc versions it isn't tested with.

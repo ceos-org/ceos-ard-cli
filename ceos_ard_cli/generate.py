@@ -1,9 +1,9 @@
 import base64
 import os
 import re
+import shutil
 import subprocess
 import tempfile
-from functools import cache
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 
@@ -39,15 +39,20 @@ FONTS = {
 }
 
 
-@cache
-def font_styles() -> str:
-    """The fonts as a style element, embedded so that the HTML and the PDF look the same everywhere."""
+def font_styles(folder: Path | None = None) -> str:
+    """The fonts as a style element: embedded, or linked to copies of the files in the `fonts` folder of `folder`."""
     rules = []
     for name, (weight, style) in FONTS.items():
-        data = base64.b64encode((TEMPLATES_DIR / "fonts" / name).read_bytes()).decode("ascii")
+        source = TEMPLATES_DIR / "fonts" / name
+        if folder:
+            (folder / "fonts").mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, folder / "fonts" / name)
+            url = f"fonts/{name}"
+        else:
+            url = "data:font/woff2;base64," + base64.b64encode(source.read_bytes()).decode("ascii")
         rules.append(
             f"@font-face {{ font-family: {FONT_FAMILY}; font-weight: {weight}; font-style: {style}; "
-            f"src: url(data:font/woff2;base64,{data}) format('woff2'); }}"
+            f"src: url({url}) format('woff2'); }}"
         )
     return "<style>\n" + "\n".join(rules) + "\n</style>\n"
 
@@ -230,7 +235,7 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
     with tempfile.TemporaryDirectory() as folder:
         if format == "html":
             fonts = Path(folder) / "fonts.html"
-            fonts.write_text(font_styles(), encoding="utf-8")
+            fonts.write_text(font_styles(None if self_contained else Path(out).resolve().parent), encoding="utf-8")
             cmd.append(f"--include-in-header={fonts}")
         result = subprocess.run(
             cmd,
