@@ -1,13 +1,13 @@
 repos:
 - repo: local
   hooks:
-    # Run the linter via Pixi
     - id: pixi-lint
       name: pixi lint
-      entry: pixi run lint
+      entry: pixi run -e dev lint-check
       language: system
-    # Run the formatter via Pixi
+      pass_filenames: false
     - id: pixi-format
       name: pixi format
-      entry: pixi run format
+      entry: pixi run -e dev format-check
       language: system
+      pass_filenames: false

@@ -274,7 +274,7 @@ def _match_changes(previous, changes, moved, default):
     for i in range(len(keys)):
         if commits[i] is None:
             take(i, lambda a, b: a[:2] == b[:2])
-    return [(key, commit if commit is not None else default) for key, commit in zip(keys, commits)]
+    return [(key, commit if commit is not None else default) for key, commit in zip(keys, commits, strict=True)]
 
 
 class GitHistory:
@@ -449,7 +449,7 @@ def make_entries(changes, block, history):
             "commit": commit,
             "block": block,
         }
-        for change, commit in zip(changes, commits)
+        for change, commit in zip(changes, commits, strict=True)
     ]
 
 

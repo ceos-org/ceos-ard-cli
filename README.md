@@ -284,4 +284,4 @@ A missing file leaves its text out of the documents.
 3. Change the code. The CLI is installed in editable mode, so `ceos-ard` runs your changes.
 4. Run the linter, the formatter and the tests: `pixi run -e dev check-all`
 
-Optionally, run `pre-commit install` to lint and format on each commit.
+Optionally, run `pre-commit install` to check the linting and the formatting on each commit.
