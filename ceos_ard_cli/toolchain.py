@@ -6,6 +6,8 @@ import tomllib
 from functools import cache
 from pathlib import Path
 
+from .problems import WARNING, Problem, report
+
 PACKAGE = Path(__file__).parent
 PACKAGE_NAME = "ceos-ard-cli"
 TOOLS = ["pandoc", "pandoc-crossref"]
@@ -53,7 +55,8 @@ def check_tools() -> None:
     for tool, pinned in pinned_versions().items():
         installed = installed_version(tool)
         if installed and installed != pinned:
-            print(f"WARNING: {tool} {installed} is used, but the CLI is tested with {tool} {pinned}")
+            message = f"{tool} {installed} is used, but the CLI is tested with {tool} {pinned}"
+            report(f"WARNING: {message}", Problem(severity=WARNING, message=message))
 
 
 @cache
