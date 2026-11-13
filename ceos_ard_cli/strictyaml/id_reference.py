@@ -35,6 +35,9 @@ class IdReference(strictyaml.ScalarValidator):
     def validate_scalar(self, chunk):
         content = None
         id = chunk.contents
+        if "#" in id:
+            # It starts the JSON pointer in the edit markers
+            fail(chunk, f"'{id}' must not contain '#'")
         try:
             file = content_file(self._base_path, self._path_template.format(id=id))
         except ValueError:

@@ -29,7 +29,8 @@ end
 local function track_raw(el)
   local marker = el.text:match("^<!%-%-%s*edit:%s*(.-)%s*%-%->$")
   if marker then
-    source = marker
+    -- Without the JSON pointer to the field, e.g. #/background
+    source = marker:match("^[^#]*")
   end
 end
 

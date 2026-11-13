@@ -33,7 +33,7 @@ nocite: |
 
 ![](assets/CEOS_logo_colour_black_text_right.png)
 
-# CEOS-ARD - ~{ type }~ - ~{ title }~
+# ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~CEOS-ARD - ~{ type }~ - ~{ title }~
 
 &nbsp;
 
@@ -52,7 +52,7 @@ Product Family Specification, ~{ type }~, ~{ title }~
 ~{ document.status.description }~
 ~( endif )~
 
-## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~Contributing Authors
+## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml#/authors -->~( endif )~Contributing Authors
 
 ~( if combined )~
 See the authors list in the separate PFS documents.
@@ -73,9 +73,8 @@ See the authors list in the separate PFS documents.
 ~{ document.definition.description }~
 
 ~( endif )~
-## Description
+## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~Description
 
-~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~
 **Product Family Specification:**
 ~{type}~, ~{ title }~ (~{ id }~)
 
@@ -96,7 +95,7 @@ See the authors list in the separate PFS documents.
 
 ~( if background )~
 
-## Background
+## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml#/background -->~( endif )~Background
 
 ~(   if combined )~
 ~(     for key, value in background.items() )~
@@ -112,7 +111,7 @@ See the authors list in the separate PFS documents.
 
 &#12;
 
-## Definitions and Abbreviations
+## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml#/glossary -->~( endif )~Definitions and Abbreviations
 
 ~( for term in glossary )~
 <!-- edit:~{ term.filepath }~ -->
@@ -126,7 +125,7 @@ See the authors list in the separate PFS documents.
 ~( endfor )~
 &#12;
 
-## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml -->~( endif )~Requirements
+## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml#/requirements -->~( endif )~Requirements
 
 **WARNING:** The section numbers in front of the title (e.g. 1.1) are not stable and may change or may be removed at any time.
 Do **not** use the numbers to refer back to specific requirements!
@@ -223,7 +222,7 @@ Note~( if requirement[type].notes | length > 1)~s~( endif )~:
 ~( endfor )~
 &#12;
 
-## References
+## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml#/references -->~( endif )~References
 
 ::: {#refs}
 :::
@@ -231,7 +230,7 @@ Note~( if requirement[type].notes | length > 1)~s~( endif )~:
 ~( if annexes )~
 &#12;
 
-## Annex~( if annexes | length > 1)~es~( endif )~
+## ~( if not combined )~<!-- edit:pfs/~{ id }~/document.yaml#/annexes -->~( endif )~Annex~( if annexes | length > 1)~es~( endif )~
 
 ~(   for annex in annexes )~
 

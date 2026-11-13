@@ -400,10 +400,10 @@ def test_html_runs_no_scripts_in_browsers(tmp_path, chromium, csp):
 
 @needs_pandoc
 class TestPandoc:
-    def build(self, tmp_path, markdown):
+    def build(self, tmp_path, markdown, bibtex=""):
         write(tmp_path / "templates" / "template.html", "$body$")
         write(tmp_path / "out" / "doc.md", markdown)
-        write(tmp_path / "out" / "doc.bib", "")
+        write(tmp_path / "out" / "doc.bib", bibtex)
         write(tmp_path / "assets" / "logo.png", "")
         write(tmp_path / "outside.png", "secret")
         run_pandoc(tmp_path / "out" / "doc", "html", tmp_path, self_contained=False)
@@ -428,6 +428,26 @@ class TestPandoc:
         html = self.build(tmp_path, "<!-- edit:requirements/a.yaml -->\n\n# Title\n\n![logo](assets/logo.png)\n")
         assert "<!-- edit:requirements/a.yaml -->" in html
         assert 'src="assets/logo.png"' in html
+
+    def test_problems_belong_to_the_file_of_a_field_marker(self, tmp_path):
+        with pytest.raises(ValueError) as error:
+            self.build(tmp_path, "## <!-- edit:pfs/SR/document.yaml#/background -->Background\n\n[x]{style=x}\n")
+        assert str(error.value).endswith(" pfs/SR/document.yaml: The attribute 'style' is not allowed")
+
+    def test_marks_the_entries_of_the_bibliography(self, tmp_path):
+        bibtex = "@misc{smith2020, title={A}}\n@misc{doe-2021.v2, title={B}}\n"
+        html = self.build(tmp_path, "---\nnocite: '@*'\n---\n\n::: {#refs}\n:::\n", bibtex)
+        for key in ["smith2020", "doe-2021.v2"]:
+            assert re.search(
+                rf'<div id="ref-{re.escape(key)}"[^>]*>\s*<!-- edit:references/{re.escape(key)}.bib -->', html
+            )
+
+    # pandoc's BibTeX reader already refuses < > " in keys, the filter doesn't rely on it
+    @pytest.mark.parametrize("key", ["a!b", "a'b", "a&b"])
+    def test_marks_no_entries_with_other_characters(self, tmp_path, key):
+        html = self.build(tmp_path, "---\nnocite: '@*'\n---\n\n::: {#refs}\n:::\n", f"@misc{{{key}, title={{A}}}}\n")
+        assert "csl-entry" in html
+        assert "edit:" not in html
 
     @pytest.mark.parametrize(
         ("markdown", "message"),

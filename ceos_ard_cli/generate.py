@@ -214,6 +214,8 @@ def run_pandoc(out: Path, format: str, input_dir: Path, self_contained: bool = T
         "-L",
         str(FILTERS_DIR / "links.lua"),  # refuse broken links and images, also the ones from the bibliography
         "-L",
+        str(FILTERS_DIR / "bibliography.lua"),  # edit markers for the entries of the bibliography
+        "-L",
         str(FILTERS_DIR / "no-sectionnumbers.lua"),  # remove section numbers from reference links
         "-L",
         str(FILTERS_DIR / "pagebreak.lua"),  # page breaks

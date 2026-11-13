@@ -6,8 +6,9 @@ from .yaml import read_yaml
 
 
 def check_pfs_name(pfs):
-    # The name of a folder in pfs, not a path that could lead elsewhere (e.g. C:x is relative to a drive)
-    if not pfs or pfs in (".", "..") or any(character in pfs for character in "/\\:"):
+    # The name of a folder in pfs, not a path that could lead elsewhere (e.g. C:x is relative to a drive),
+    # without # as it starts the JSON pointer in the edit markers
+    if not pfs or pfs in (".", "..") or any(character in pfs for character in "/\\:#"):
         raise ValueError(f"Invalid PFS '{pfs}', expected the name of a folder in 'pfs'")
 
 

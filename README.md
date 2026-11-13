@@ -190,6 +190,22 @@ The JSON is the only output on stdout, the progress goes to stderr.
 
 The exit code is 1 if there's at least one error, otherwise 0.
 
+### Edit markers
+
+The Markdown and HTML files mark the building blocks with comments, e.g. for an editor that adds edit buttons to the HTML:
+
+```html
+<!-- edit:requirements/metadata/data-access.yaml -->
+<!-- edit:references/li2012.bib -->
+<!-- edit:pfs/SR/document.yaml#/background -->
+```
+
+- The path is the file of the building block, relative to the input folder or absolute.
+  The entries of the bibliography are only marked in the HTML.
+- A `#` starts a [JSON pointer](https://www.rfc-editor.org/rfc/rfc6901#section-6) to the field that the part of the document shows,
+  evaluated against the parsed YAML. IDs and PFS names can't contain `#`.
+- The fields of a PFS's `document.yaml` are only marked in single-PFS documents.
+
 ## Document history
 
 The documents can list what changed between the releases of a PFS. This is off by default, as it needs the git history and the releases:
