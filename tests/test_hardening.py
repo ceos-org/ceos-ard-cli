@@ -435,10 +435,19 @@ class TestPandoc:
         assert str(error.value).endswith(" pfs/SR/document.yaml: The attribute 'style' is not allowed")
 
     def test_marks_the_entries_of_the_bibliography(self, tmp_path):
-        bibtex = "@misc{smith2020, title={A}}\n@misc{doe2021, title={B}}\n"
+        bibtex = "@misc{smith2020, title={A}}\n@misc{doe-2021.v2, title={B}}\n"
         html = self.build(tmp_path, "---\nnocite: '@*'\n---\n\n::: {#refs}\n:::\n", bibtex)
-        for key in ["smith2020", "doe2021"]:
-            assert re.search(rf'<div id="ref-{key}"[^>]*>\s*<!-- edit:references/{key}.bib -->', html)
+        for key in ["smith2020", "doe-2021.v2"]:
+            assert re.search(
+                rf'<div id="ref-{re.escape(key)}"[^>]*>\s*<!-- edit:references/{re.escape(key)}.bib -->', html
+            )
+
+    # pandoc's BibTeX reader already refuses < > " in keys, the filter doesn't rely on it
+    @pytest.mark.parametrize("key", ["a!b", "a'b", "a&b"])
+    def test_marks_no_entries_with_other_characters(self, tmp_path, key):
+        html = self.build(tmp_path, "---\nnocite: '@*'\n---\n\n::: {#refs}\n:::\n", f"@misc{{{key}, title={{A}}}}\n")
+        assert "csl-entry" in html
+        assert "edit:" not in html
 
     @pytest.mark.parametrize(
         ("markdown", "message"),

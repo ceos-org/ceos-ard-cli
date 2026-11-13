@@ -12,7 +12,8 @@ end
 return {
   {
     Div = function(el)
-      local key = el.identifier:match("^ref%-(.+)$")
+      -- Runs after sanitize.lua: only the characters that the server allows in edit paths, they can't end the comment
+      local key = el.identifier:match("^ref%-([%w_.~:%-]+)$")
       if key then
         el.content:insert(1, pandoc.RawBlock("html", "<!-- edit:references/" .. key .. ".bib -->"))
         return el
