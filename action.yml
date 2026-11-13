@@ -43,7 +43,10 @@ runs:
         ceos-ard --version
         pandoc --version
         pandoc-crossref --version
-    - name: Install the browser for the PDF generation
+    - name: Install the browser and the font for the PDF generation
       if: inputs.browser == 'true'
       shell: bash
-      run: playwright install chromium --with-deps
+      # The header and footer of the PDF can't use the fonts that the documents embed
+      run: |
+        playwright install chromium --with-deps
+        if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get install -y fonts-crosextra-carlito; fi

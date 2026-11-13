@@ -88,7 +88,8 @@ def test_failed_builds_leave_no_files(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="html file failed"):
         generate("doc", target, tmp_path, self_contained=False, no_docx=True)
 
-    assert list((tmp_path / "out").iterdir()) == []
+    # the fonts are shared with other documents, like the assets
+    assert [path.name for path in (tmp_path / "out").iterdir()] == ["fonts"]
 
 
 @pytest.mark.parametrize(
@@ -153,6 +154,22 @@ def test_failed_stable_compilations_keep_all_files_without_a_version(tmp_path, f
         module.compile("SR", tmp_path / "out" / "SR", tmp_path, stable=True)
 
     assert (tmp_path / "out" / "SR.html").is_file()
+
+
+@needs_pandoc
+@pytest.mark.parametrize("self_contained", [True, False])
+def test_fonts_are_embedded_or_linked(tmp_path, self_contained):
+    write(tmp_path / "out" / "doc.md", "# Title\n")
+    write(tmp_path / "out" / "doc.bib", "")
+
+    run_pandoc(tmp_path / "out" / "doc", "html", tmp_path, self_contained=self_contained)
+
+    html = (tmp_path / "out" / "doc.html").read_text(encoding="utf-8")
+    assert html.count("@font-face { font-family: Carlito;") == 4
+    assert ("url(data:font/woff2;base64," in html) == self_contained
+    assert ("url(fonts/Carlito-Regular.woff2)" in html) != self_contained
+    assert (tmp_path / "out" / "fonts" / "Carlito-Regular.woff2").is_file() != self_contained
+    assert (tmp_path / "out" / "fonts" / "OFL.txt").is_file() != self_contained
 
 
 def test_stable_documents_keep_dots_in_their_name(tmp_path, failing_compile, monkeypatch):
