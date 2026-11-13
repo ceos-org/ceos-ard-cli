@@ -14,6 +14,8 @@
       overflow-wrap: break-word;
       text-rendering: optimizeLegibility;
       font-kerning: normal;
+      /* Ligatures like fi are single characters in the PDF, which breaks searching and copying */
+      font-variant-ligatures: no-common-ligatures;
       font-size: 12pt;
       font-family: Carlito, Calibri, Roboto, sans-serif;
       background-color: white;
