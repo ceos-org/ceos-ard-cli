@@ -169,6 +169,7 @@ def test_fonts_are_embedded_or_linked(tmp_path, self_contained):
     assert ("url(data:font/woff2;base64," in html) == self_contained
     assert ("url(fonts/Carlito-Regular.woff2)" in html) != self_contained
     assert (tmp_path / "out" / "fonts" / "Carlito-Regular.woff2").is_file() != self_contained
+    assert (tmp_path / "out" / "fonts" / "OFL.txt").is_file() != self_contained
 
 
 def test_stable_documents_keep_dots_in_their_name(tmp_path, failing_compile, monkeypatch):

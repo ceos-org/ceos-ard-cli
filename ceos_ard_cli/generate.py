@@ -47,6 +47,8 @@ def font_styles(folder: Path | None = None) -> str:
         if folder:
             (folder / "fonts").mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, folder / "fonts" / name)
+            # The license must be distributed with the fonts
+            shutil.copyfile(source.with_name("OFL.txt"), folder / "fonts" / "OFL.txt")
             url = f"fonts/{name}"
         else:
             url = "data:font/woff2;base64," + base64.b64encode(source.read_bytes()).decode("ascii")
