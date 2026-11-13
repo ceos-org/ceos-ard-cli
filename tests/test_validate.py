@@ -6,9 +6,9 @@ import pytest
 from click.testing import CliRunner
 
 from ceos_ard_cli import cli
-from ceos_ard_cli.utils import files, yaml
 from ceos_ard_cli.problems import unique
 from ceos_ard_cli.schema import DOCUMENT_SECTIONS
+from ceos_ard_cli.utils import files, yaml
 from ceos_ard_cli.validate import validate
 
 VALID = "id: {id}\ntitle: Title\nrequirements:\n  threshold:\n    description: Text\n"

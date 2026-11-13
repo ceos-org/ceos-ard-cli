@@ -324,7 +324,9 @@ def resolve_refs(data):
     return data
 
 
-def read_data(pfs: list[str], input_dir: Path, stable: bool = False, metadata: dict = {}, warn: bool = True) -> dict:
+def read_data(
+    pfs: list[str], input_dir: Path, stable: bool = False, metadata: dict | None = None, warn: bool = True
+) -> dict:
     """The data for the template of one PFS or of several PFS combined."""
     multi_pfs = {}
     for p in pfs:
@@ -349,6 +351,7 @@ def read_data(pfs: list[str], input_dir: Path, stable: bool = False, metadata: d
         data["authors"] = "\n".join(map(lambda a: f"- {a}", data["authors"]))
 
     # Override metadata if provided
+    metadata = metadata or {}
     data["id"] = metadata.get("id") or data["id"]
     data["title"] = metadata.get("title") or data["title"]
     data["type"] = metadata.get("type") or data["type"]
@@ -392,7 +395,7 @@ def prepare(
     out: Path | str,
     input_dir: Path | str,
     stable: bool = False,
-    metadata: dict = {},
+    metadata: dict | None = None,
     debug: bool = False,
 ) -> tuple[dict, Path]:
     """The part of a compilation that the editable and the read-only document share:
@@ -450,7 +453,7 @@ def compile(
     input_dir: Path | str,
     editable: bool = False,
     stable: bool = False,
-    metadata: dict = {},
+    metadata: dict | None = None,
     debug: bool = False,
     history: bool = False,
     github_repo: str = DEFAULT_GITHUB_REPO,
@@ -525,7 +528,7 @@ def render_markdown(
 
     # Merge individual requirements into goal and threshold requirements
     for block in context["requirements"]:
-        for idx, req in enumerate(block["requirements"]):
+        for req in block["requirements"]:
             threshold = None
             goal = None
             for reqname in req["requirements"]:
