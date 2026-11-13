@@ -8,7 +8,7 @@ from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
 
 from .changelog import DEFAULT_GITHUB_REPO
-from .compile import compile, remove_outputs
+from .compile import compile_files, prepare, remove_outputs
 from .problems import WARNING, MultipleErrors, Problem, report, to_problems
 from .toolchain import BROWSER_MISSING, check_browser, check_tools
 from .utils.files import read_file
@@ -119,28 +119,22 @@ def generate(
         check_browser()
     input_dir = Path(input_dir).resolve()
     output = Path(output).resolve()
-    options = {
-        "stable": stable,
-        "metadata": metadata,
-        "history": history,
-        "github_repo": github_repo,
-        "patch_changes": patch_changes,
-        "offline": offline,
-    }
+    history = {"history": history, "github_repo": github_repo, "patch_changes": patch_changes, "offline": offline}
 
     # Problems of a combined document can't be assigned to one PFS
     label = pfs[0] if len(pfs) == 1 else None
-    target = None
+    # Once for the editable and the read-only document
+    data, target = prepare(pfs, output, input_dir, stable, metadata)
     try:
         if not no_docx:
             print("- Generating editable Markdown")
-            target = compile(pfs, output, input_dir, editable=True, **options)
+            compile_files(data, target, pfs, input_dir, editable=True, **history)
 
             print("- Generating Word")
             run_pandoc(target, "docx", input_dir, self_contained, pfs=label)
 
         print("- Generating read-only Markdown")
-        target = compile(pfs, output, input_dir, editable=False, **options)
+        compile_files(data, target, pfs, input_dir, editable=False, **history)
 
         print("- Generating HTML")
         run_pandoc(target, "html", input_dir, self_contained, pfs=label)
@@ -149,9 +143,7 @@ def generate(
             print("- Generating PDF")
             run_playwright(target, input_dir)
     except Exception:
-        # compile cleans up after its own failures, before the name of the document is known here
-        if target is not None:
-            remove_outputs(target)
+        remove_outputs(target)
         raise
 
 

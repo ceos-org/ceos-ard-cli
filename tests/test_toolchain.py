@@ -52,6 +52,22 @@ def test_other_versions_are_warned_about(monkeypatch, capsys, installed, warns):
     assert ("pandoc 3.6.2 is used, but the CLI is tested with pandoc 3.13" in output) == warns
 
 
+def test_other_versions_are_reported_as_problems(monkeypatch, capsys):
+    from ceos_ard_cli.problems import collect
+
+    monkeypatch.setattr(shutil, "which", lambda tool: tool)
+    monkeypatch.setattr(toolchain, "pinned_versions", lambda: {"pandoc": "3.13"})
+    monkeypatch.setattr(toolchain, "installed_version", lambda tool: "3.6.2")
+
+    with collect() as problems:
+        toolchain.check_tools()
+
+    assert [problem.to_dict() for problem in problems] == [
+        {"severity": "warning", "message": "pandoc 3.6.2 is used, but the CLI is tested with pandoc 3.13"}
+    ]
+    assert capsys.readouterr().out == ""
+
+
 def test_checks_can_be_skipped(monkeypatch, capsys):
     def fail(*args, **kwargs):
         raise AssertionError("must not look for the tools")
@@ -87,11 +103,11 @@ def test_missing_browser_fails_the_generation_early(tmp_path, monkeypatch):
 def test_browser_is_not_checked_without_need(tmp_path, monkeypatch, skip):
     module = importlib.import_module("ceos_ard_cli.generate")
 
-    def compile(*args, **kwargs):
+    def prepare(*args, **kwargs):
         raise ValueError("compiling")
 
     monkeypatch.setattr(module, "check_tools", lambda: None)
-    monkeypatch.setattr(module, "compile", compile)
+    monkeypatch.setattr(module, "prepare", prepare)
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path / "browsers"))
     if skip == "env":
         monkeypatch.setenv(toolchain.SKIP_CHECK, "1")

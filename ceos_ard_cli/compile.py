@@ -1,3 +1,5 @@
+import bisect
+import copy
 import logging
 import re
 from collections import defaultdict
@@ -10,9 +12,12 @@ from .links import resolve_links, resolve_titles
 from .problems import MultipleErrors, deprecation, report
 from .schema import REFERENCE_PATH, get_empty_requirement_part
 from .utils.deprecation import describe, find_deprecated_blocks
-from .utils.files import check_no_symlinks, content_file, read_file, write_file
+from .utils.files import check_no_symlinks, content_file, fix_path, read_file, write_file
 from .utils.pfs import read_pfs
 from .utils.template import read_document_sections, read_template
+
+# Marks an assets folder in the output as a copy made by the CLI, which may be purged
+ASSETS_MARKER = ".ceos-ard-cli"
 
 OUTPUT_EXTENSIONS = [".md", ".bib", ".docx", ".html", ".pdf"]
 
@@ -93,8 +98,6 @@ def topological_sort_requirements(
         for successor in successors:
             in_degree[successor] -= 1
             if in_degree[successor] == 0:
-                import bisect
-
                 bisect.insort(queue, successor)
 
     # Check for cycles
@@ -356,6 +359,91 @@ def read_data(pfs: list[str], input_dir: Path, stable: bool = False, metadata: d
     return data
 
 
+def sync_assets(source: Path, target: Path, debug: bool = False):
+    """Makes `target` a copy of `source`: copies new and changed files, removes all others."""
+    marker = target / ASSETS_MARKER
+    if target.is_dir() and any(target.iterdir()) and not marker.is_file():
+        raise ValueError(
+            f"'{fix_path(target)}' was not created by the CLI and its files would be removed: "
+            "choose another output folder or remove it"
+        )
+    target.mkdir(parents=True, exist_ok=True)
+    marker.touch()
+
+    logger = logging.getLogger("ceos_ard_cli.dirsync")
+    logger.handlers.clear()
+    logger.propagate = False
+    logger.addHandler(logging.StreamHandler() if debug else logging.NullHandler())
+    logger.setLevel(logging.INFO if debug else logging.CRITICAL)
+    sync(
+        str(source),
+        str(target),
+        "sync",
+        create=True,
+        purge=True,
+        content=True,
+        ignore=[re.escape(ASSETS_MARKER) + "$"],
+        logger=logger,
+    )
+
+
+def prepare(
+    pfs: list[str],
+    out: Path | str,
+    input_dir: Path | str,
+    stable: bool = False,
+    metadata: dict = {},
+    debug: bool = False,
+) -> tuple[dict, Path]:
+    """The part of a compilation that the editable and the read-only document share:
+    checks the input folder, copies the assets and reads the data. Returns the data and the name of the document."""
+    check_no_symlinks(input_dir)
+    out = Path(out)
+    folder = out.parent
+    # create folder if needed
+    folder.mkdir(parents=True, exist_ok=True)
+    # sync assets (copy new/changed files, remove stale ones)
+    assets_target = folder.resolve() / "assets"
+    input_dir = Path(input_dir).resolve()
+    assets_source = input_dir / "assets"
+    if assets_source != assets_target:
+        sync_assets(assets_source, assets_target, debug)
+
+    try:
+        data = read_data(pfs, input_dir, stable, metadata)
+    except Exception:
+        # Without the data, the name of a stable document isn't known, and the draft's files must stay
+        if not stable:
+            remove_outputs(out)
+        raise
+    if stable:
+        # A version can have characters that file names can't, e.g. n/a for combined documents
+        version = re.sub(r'[\\/:*?"<>|]+', "-", data["version"])
+        out = out.with_name(f"{out.name}-v{version}")
+    return data, out
+
+
+def compile_files(
+    data: dict, out: Path, pfs: list[str], input_dir: Path | str, editable: bool = False, debug: bool = False, **history
+):
+    """Writes the Markdown and the bibliography of a prepared document."""
+    try:
+        # write a json file for debugging
+        if debug:
+            import json
+
+            write_file(f"{out}.debug.json", json.dumps(data, indent=2))
+
+        # Rendering changes the data, which the other variant of the document needs as it was read
+        compile_markdown(
+            copy.deepcopy(data), f"{out}.md", editable, input_dir, pfs=pfs[0] if len(pfs) == 1 else None, **history
+        )
+        compile_bibtex(data, f"{out}.bib", input_dir)
+    except Exception:
+        remove_outputs(out)
+        raise
+
+
 def compile(
     pfs: list[str] | str,
     out: Path | str,
@@ -372,58 +460,19 @@ def compile(
     if isinstance(pfs, str):
         pfs = [pfs]
 
-    check_no_symlinks(input_dir)
-    out = Path(out)
-    folder = out.parent
-    # create folder if needed
-    folder.mkdir(parents=True, exist_ok=True)
-    # sync assets (copy new/changed files, remove stale ones)
-    assets_target = folder / "assets"
-    input_dir = Path(input_dir).resolve()
-    assets_source = input_dir / "assets"
-    if assets_source != assets_target:
-        logger = logging.getLogger("ceos_ard_cli.dirsync")
-        logger.handlers.clear()
-        logger.propagate = False
-        logger.addHandler(logging.StreamHandler() if debug else logging.NullHandler())
-        logger.setLevel(logging.INFO if debug else logging.CRITICAL)
-        sync(str(assets_source), str(assets_target), "sync", create=True, purge=True, content=True, logger=logger)
-
-    data = None
-    try:
-        data = read_data(pfs, input_dir, stable, metadata)
-
-        if stable:
-            # A version can have characters that file names can't, e.g. n/a for combined documents
-            version = re.sub(r'[\\/:*?"<>|]+', "-", data["version"])
-            out = out.with_name(f"{out.name}-v{version}")
-
-        # write a json file for debugging
-        if debug:
-            import json
-
-            write_file(f"{out}.debug.json", json.dumps(data, indent=2))
-
-        # create the markdown file
-        compile_markdown(
-            data,
-            f"{out}.md",
-            editable,
-            input_dir,
-            history=history,
-            github_repo=github_repo,
-            patch_changes=patch_changes,
-            offline=offline,
-            pfs=pfs[0] if len(pfs) == 1 else None,
-        )
-        # write bibtex file to disk
-        compile_bibtex(data, f"{out}.bib", input_dir)
-    except Exception:
-        # Without the data, the name of a stable document isn't known, and the draft's files must stay
-        if data is not None or not stable:
-            remove_outputs(out)
-        raise
-
+    data, out = prepare(pfs, out, input_dir, stable, metadata, debug)
+    compile_files(
+        data,
+        out,
+        pfs,
+        input_dir,
+        editable,
+        debug,
+        history=history,
+        github_repo=github_repo,
+        patch_changes=patch_changes,
+        offline=offline,
+    )
     return out
 
 
@@ -442,7 +491,6 @@ def merge_bibtex(data, input_dir: Path) -> str:
     return "\n".join(read_file(content_file(input_dir, REFERENCE_PATH.format(id=ref))) for ref in data["references"])
 
 
-# Note: This function is not used for the append/replace functionality
 def append_requirement(target, req):
     if len(target["description"]) > 0:
         target["description"] += "\n\n" + req["description"]
