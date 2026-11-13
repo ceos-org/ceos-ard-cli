@@ -255,11 +255,28 @@ def test_validation_only_warns_about_missing_sections_that_are_used(tmp_path, ca
     assert all(message in line for line in lines)
 
 
-@pytest.mark.parametrize("combined, expected", [(False, 3), (True, 0)])
-def test_only_single_pfs_documents_link_to_their_document_yaml(tmp_path, combined, expected):
-    markdown = read_template(tmp_path).render(**context(combined=combined, document=read_document_sections(tmp_path)))
+@pytest.mark.parametrize("combined", [False, True])
+def test_only_single_pfs_documents_link_to_the_fields_of_their_document_yaml(tmp_path, combined):
+    annexes = [{"id": "a", "title": "Annex", "description": "Text", "filepath": "sections/annexes/a.yaml"}]
+    background = {"Surface Reflectance": "Text"} if combined else "Text"
+    data = context(combined=combined, background=background, annexes=annexes)
 
-    assert markdown.count("<!-- edit:pfs/SR/document.yaml -->") == expected
+    markdown = read_template(tmp_path).render(**data, document=read_document_sections(tmp_path))
+
+    headings = [
+        ("# ", "", "CEOS-ARD - Optical - Surface Reflectance"),
+        ("## ", "#/authors", "Contributing Authors"),
+        ("## ", "", "Description"),
+        ("## ", "#/background", "Background"),
+        ("## ", "#/glossary", "Definitions and Abbreviations"),
+        ("## ", "#/requirements", "Requirements"),
+        ("## ", "#/references", "References"),
+        ("## ", "#/annexes", "Annex"),
+    ]
+    for level, pointer, heading in headings:
+        marker = "" if combined else f"<!-- edit:pfs/SR/document.yaml{pointer} -->"
+        assert f"\n{level}{marker}{heading}\n" in markdown
+    assert ("pfs/SR/document.yaml" in markdown) is not combined
 
 
 MULTI = "First paragraph.\n\nSecond paragraph.\n\n- item"
