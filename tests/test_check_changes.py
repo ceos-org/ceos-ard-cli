@@ -36,6 +36,8 @@ CHANGE = """  - date: {date}
     reason: Test
 """
 
+INITIAL_CHANGE = CHANGE.format(date="2026-01-01", level="patch", change="Initial")
+
 
 def git(cwd, *args):
     subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, env=GIT_ENV)
@@ -46,7 +48,7 @@ def write(path, content):
     path.write_text(content, encoding="utf-8")
 
 
-def requirement(id, description="Test", changes=(CHANGE.format(date="2026-01-01", level="patch", change="Initial"),)):
+def requirement(id, description="Test", changes=(INITIAL_CHANGE,)):
     return REQUIREMENT.format(id=id, title=id.title(), description=description, changes="".join(changes) or "")
 
 

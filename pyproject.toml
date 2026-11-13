@@ -98,13 +98,17 @@ py315 = ["dev", "py315"]
 [tool.pixi.tasks]
 install-browser = "playwright install chromium --with-deps"
 build = "python -m build"
-format = "ruff format ceos_ard_cli/"
-format-check = "ruff format --check ceos_ard_cli/"
-lint = "ruff check ceos_ard_cli/ --fix --select I,UP"
-lint-check = "ruff check ceos_ard_cli/ --select I,UP"
+format = "ruff format ceos_ard_cli tests"
+format-check = "ruff format --check ceos_ard_cli tests"
+lint = "ruff check ceos_ard_cli tests --fix"
+lint-check = "ruff check ceos_ard_cli tests"
 test = "pytest tests/"
 check-all = {depends-on = ["format", "lint", "test"]}
 install-dev = "python -m pip install -e ."
 
 [tool.ruff]
 line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I", "UP"]
+ignore = ["E731"]
